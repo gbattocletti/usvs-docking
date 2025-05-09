@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=67.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seaclear_dp"
+version = "0.1.0"
+description = "SeaCAT2 Dynamic Positioning for SeaClear2."
+authors = [
+    {name="Gianpietro Battocletti", email="battocletti.gianpietro@gmail.com"},
+]
+readme = "README.md"
+keywords = [
+    "dynamic-positioning",
+    "autonomous-surface-vehicle",
+    "unmanned-surface-vehicle",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "pygount",
+    "pipreqs",
+    "pytest",
+]
+
+[tool.setuptools]
+license-files = ["LICENSE"]
+
+[tool.black]
+line-length = 88
+exclude = 'dev/.*'
+
+[tool.isort]
+profile = "black"
+py_version = 311
+line_length = 88
+skip = [
+    "dev/.*"
+]
+
+[tool.license]
+name = "GNU General Public License v3.0"
+url = "https://www.gnu.org/licenses/gpl-3.0.en.html"
