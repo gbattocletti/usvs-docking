@@ -1,4 +1,4 @@
-# USV Dynamic Positioning Control
+# SeaCat2 Dynamic Positioning Control
 
  [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
  ![Python 3.11](https://img.shields.io/badge/python->=3.11-green.svg)
@@ -9,28 +9,18 @@ This repository contains a collection of dynamic models and controllers for the 
 ## Installation
 To install, clone the repository by running:
 ```sh
-git clone https:<REPO URL (TODO)>.git
-cd repo-name
+git clone https://github.com/gbattocletti/seacat2-dynamic-positioning.git
+cd seacat2-dynamic-positioning
+pip install .
 ```
 
-Create a conda env (or another virtual environment) and install the required dependencies. A 
+In case you want to install also the dependencies used in the development phase you can run instead:
 ```sh
-conda env create -n <new-env-name> -f environment.yml
-```
-
-For development, some additional dependencies can be installed:
-```sh
-
-```
-
-Finally, install the package in edit mode to be able to import and use it:
-```sh
-cd <repo-root>
 pip install -e ".[dev]"
 ```
 
 ## Project Structure
-
+The project is structured as shown below:
 ```
 root/  
 │  
