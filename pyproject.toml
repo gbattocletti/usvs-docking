@@ -3,7 +3,7 @@ requires = ["setuptools>=67.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "seacat2_dp"
+name = "seacat_dp"
 version = "0.1.0"
 description = "SeaCAT2 Dynamic Positioning Control."
 authors = [
