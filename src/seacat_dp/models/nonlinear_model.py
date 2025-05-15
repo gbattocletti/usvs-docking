@@ -7,8 +7,8 @@ class NonlinearModel:
     """
     Nonlinear 2D model class that computes the nonlinear state and output equations.
 
-    The state vector is defined as:
-    q = [x, y, theta, u_x, u_y, omega]^T
+    The state vector is defined as a (6, ) vector:
+    q (np.ndarray): [x, y, theta, u_x, u_y, omega]
 
     where:
         x (float): position along x axis (inertial frame)
@@ -16,49 +16,80 @@ class NonlinearModel:
         theta (float): orientation (angle between body frame and inertial frame)
         u_x (float): velocity along x axis (body frame)
         u_y (float): velocity along y axis (body frame)
-        omega (float): angular velocity
+        omega (float): angular velocity (derivative of theta)
+
+    Additionally, the thruster forces are stored in the model as a (4, ) vector:
+    f (np.ndarray): [f_r, f_l, f_bow_r, f_bow_l]
+
+    where:
+        f_r (float): force to the right stern (rear) thruster
+        f_l (float): force to the left stern (rear) thruster
+        f_bow_r (float): force to the right bow thruster
+        f_bow_l (float): force to the left bow thruster
+
+    Finally, the instance attributes contain all the constant model parameters and
+    matrices, which are computed at initialization time starting from the input
+    parameter object.
     """
 
-    def __init__(self, par: Parameters, dt: float):
+    def __init__(self, par: Parameters):
         """
         Initialize the nonlinear model of the SeaCat2.
 
         Args:
             parameters (Parameters): Parameters object containing the parameters for
             the model.
-            dt (float): time step for the model [s].
         """
-        # Model time step
-        self.dt = dt  # time step [s]
+        # NOTE: Some of the parameters are copied and saved in as attribute for later
+        # use in the dynamics function.
+
+        ### MODEL PARAMETERS ###
+        # Model parameters
+        self.par = par  # parameters object
+        self.dt = 0.001  # time step [s]
+        self.integration_method = "euler"  # {"euler", "rk4", ...}
 
         # Model state
-        self.q = np.zeros((6, 1))  # state vector [x, y, theta, u_x, u_y, omega]
-        self.f = np.zeros((4, 1))  # force vector [f_r, f_l, f_bow_r, f_bow_l]
+        self.q = np.zeros(6)  # state vector [x, y, theta, u_x, u_y, omega]
+        self.f = np.zeros(4)  # force vector [f_r, f_l, f_bow_r, f_bow_l]
 
-        # Mass and inertia matrix
-        # Rigid body mass and inertia
-        M_RB = np.diag(
-            [par.m, par.m, par.m, par.I_xx, par.I_yy, par.I_zz]
-        )  # Rigid body inertia matrix
-        M_RB[1, 5] = par.xg * par.m
-        M_RB[5, 1] = par.xg * par.m
+        ### CONSTANT MODEL PARAMETERS ###
+        # Rigid body mass and inertia properties
+        self.m = par.m
+        self.m_xg = par.xg * par.m
+        M_rb = np.diag([par.m, par.m, par.I_zz])
+        M_rb[1, 2] = self.m_xg
+        M_rb[2, 1] = self.m_xg
 
-        # Added inertia properties. Multiplication factors are taken from otter.py model
-        # in the PythonVehicleSimulator.
-        X_udot = added_mass_surge(
-            par.m, par.l_tot
-        )  # Added mass along x and y, added inertia around z
-        Y_vdot = 1.5 * par.m
-        N_rdot = 1.7 * par.I_zz
-        M_A = np.diag([X_udot, Y_vdot, 0, 0, 0, N_rdot])  # Added inertia matrix
+        # Added inertia properties. Multiplication factors are taken from the otter.py
+        # model in the PythonVehicleSimulator.
+        self.X_udot = self.added_mass_surge(par)
+        self.Y_vdot = 1.5 * par.m
+        self.N_rdot = 1.7 * par.I_zz
+        self.Y_rdot = 0
+        M_a = np.diag([self.X_udot, self.Y_vdot, self.N_rdot])
+        M_a[1, 2] = self.Y_rdot
+        M_a[2, 1] = self.Y_rdot
 
-        # Stack all mass and inertia properties in a 6x6 matrix
-        self.M = M_RB + M_A  # mass matrix of the SeaCat2
+        # Mass and inertia matrix (sum rigid and added mass and inertia properties)
+        self.M = M_rb + M_a  # (3, 3) matrix
+        self.M_inv = np.linalg.inv(self.M)  # (3, 3) matrix
 
-        # Coriolis matrices C, C_A, and C_RB are ignored under assumption of low speeds.
+        # Coriolis centripetal matrix
+        # The Coriolis matrix depends on the current USV state and is therefore updated
+        # directly in the dynamics function.
+        self.C = np.zeros((3, 3))  # (3, 3) matrix
 
         # Linear damping matrix
-        self.DL = np.zeros(3)
+        self.Xu = 24.4 * par.g / par.u_max
+        self.Yv = self.M[1, 1] / par.t_sway
+        self.Nr = self.M[2, 2] / par.t_yaw
+        self.D_L = np.diag([self.Xu, self.Yv, self.Nr])
+
+        # Nonlinear damping matrix
+        # The nonlinear damping matrix depends on the current USV state and is therefore
+        # updated directly in the dynamics function.
+        self.D_NL = np.zeros((3, 3))  # (3, 3) matrix
 
         # Thrust allocation matrix
         self.T = np.array(
@@ -72,97 +103,268 @@ class NonlinearModel:
                     -par.l_bow * np.cos(par.alpha) - par.d_bow * np.sin(par.alpha),
                 ],
             ]
-        )
+        )  # (3, 4) matrix
+
+        # Thrusters weight matrix
+        W_mat = np.diag([1, 1, 10, 10])  # (4, 4) matrix
 
         # Pseudo-inverse of the thrust matrix (maps CoM forces to thruster forces)
-        W_mat = np.diag([1, 1, 10, 10])  # Thrusters weight matrix
         W_inv = np.linalg.inv(W_mat)  # Inverse of the weight matrix
         self.T_pinv = W_inv @ self.T.T @ np.linalg.inv(self.T @ W_inv @ self.T.T)
 
         # Thrusters time delay
-        self.thrust_delay = np.array([0.1, 0.1, 0.1, 0.1])  # thrust time delay [s]
+        self.thrust_delay = np.array([par.t_stern, par.t_stern, par.t_bow, par.t_bow])
+
+    def set_time_step(self, dt: float):
+        """
+        Sets the time step for the model.
+
+        Args:
+            dt (float): time step [s]
+        """
+        self.dt = dt
+
+    def set_integration_method(self, method: str):
+        """
+        Sets the integration method for the model.
+
+        Args:
+            method (str): integration method {"euler", "rk4", ...}
+        """
+        if not method in ["euler", "rk4"]:
+            raise ValueError(
+                f"Integration method {method} not implemented. Use 'euler' or 'rk4'."
+            )
+        self.integration_method = method
+
+    def set_initial_conditions(self, q0: np.ndarray):
+        """
+        Sets the initial conditions for the model.
+
+        Args:
+            q0 (np.ndarray): initial state vector [x, y, theta, u_x, u_y, omega]^T. The
+                    position components are expressed in the inertial reference frame,
+                    while the velocity ones are expressed in the body reference frame.
+        """
+        if q0.shape != (6,):
+            raise ValueError("Initial conditions must be a (6, ) vector.")
+        self.q = q0
+
+    def __str__(self):
+        """
+        Returns a string representation of the model state.
+        """
+        return f"Current state:\n\t q={self.q}\n\t f={self.f}\n\n"
 
     def __call__(
         self,
         u: np.ndarray,
-        b: np.ndarray,
-        w: np.ndarray,
+        b_current: np.ndarray,
+        b_wind: np.ndarray,
     ) -> np.ndarray:
-        return self.step(u, b, w)
+        return self.step(u, b_current, b_wind)
 
-    def step(self, u: np.ndarray, b: np.ndarray, w: np.ndarray) -> np.ndarray:
+    def step(
+        self, u: np.ndarray, b_current: np.ndarray, b_wind: np.ndarray
+    ) -> np.ndarray:
         """
-        Perform one step of the model nonlinear ODE.
+        Computes the next state of the model using the nonlinear dynamics.
 
         Args:
-            u (np.ndarray): (4, 1) control input vector.
-
+            u (np.ndarray): (4, ) control input vector.
             where:
                 u[0] (float): force of the right rear thruster
                 u[1] (float): force of the left rear thruster
                 u[2] (float): force of the right bow thruster
                 u[3] (float): force of the left bow thruster
 
-            b (np.ndarray): (3, 1) vector of external forces acting on the system
-                            (measured disturbances).
+            b_current (np.ndarray): (3, ) vector of the water current exogenous forces
+                    (measured disturbance) acting on the center of mass of the system
+                    and expressed in the inertial reference frame.
             where:
-                b[0] (float): force along x axis (inertial frame)
-                b[1] (float): force along y axis (inertial frame)
-                b[2] (float): moment around z axis (inertial frame)
+                b_current[0] (float): force along x axis
+                b_current[1] (float): force along y axis
+                b_current[2] (float): moment around z axis
 
-            w (np.ndarray): (6, 1) vector of measurement noise (white Gaussian noise).
-                            Indexes match the state vector q.
+            b_wind (np.ndarray): (3, ) vector of the wind exogenous forces (measured
+                    disturbance) acting on the center of mass of the system and
+                    expressed in the intertial reference frame.
+            where:
+                b_wind[0] (float): force along x axis
+                b_wind[1] (float): force along y axis
+                b_wind[2] (float): moment around z axis
 
         Returns:
-            q_plus (np.ndarray): (6, 1) updated state vector. Indexes match the state q.
+            np.ndarray: updated state vector q.
         """
 
-        # force vector time delay
-        for i in range(4):
-            self.f[i] = (
-                self.f[i] + ((u[i] - self.f[i]) / self.thrust_delay[i]) * self.dt
+        if self.integration_method == "euler":
+            self.f = self.f + self.thruster_dynamics(self.f, u) * self.dt
+            self.q = self.q + self.dynamics(self.q, self.f, b_current, b_wind) * self.dt
+
+        elif self.integration_method == "rk4":
+            # thruster dynamics
+            k1 = self.thruster_dynamics(self.f, u)
+            k2 = self.thruster_dynamics(self.f + k1 * self.dt / 2, u)
+            k3 = self.thruster_dynamics(self.f + k2 * self.dt / 2, u)
+            k4 = self.thruster_dynamics(self.f + k3 * self.dt, u)
+            self.f = self.f + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
+
+            # USV dynamics
+            k1 = self.dynamics(self.q, self.f, b_current, b_wind)
+            k2 = self.dynamics(self.q + k1 * self.dt / 2, self.f, b_current, b_wind)
+            k3 = self.dynamics(self.q + k2 * self.dt / 2, self.f, b_current, b_wind)
+            k4 = self.dynamics(self.q + k3 * self.dt, self.f, b_current, b_wind)
+            self.q = self.q + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
+
+        else:
+            raise ValueError(
+                f"Integration method {self.integration_method} not implemented."
             )
 
-        # update state vector # TODO
-        self.q = np.zeros((6, 1))
-
+        # Return the updated state
         return self.q
 
+    def dynamics(
+        self, q: np.ndarray, f: np.ndarray, b_current: np.ndarray, b_wind: np.ndarray
+    ) -> np.ndarray:
+        """
+        SeaCat2 dynamic model ODE.
 
-def added_mass_surge(mass: float, length: float) -> float:
-    """
-    Computes an approximation of the added mass in surge (i.e., along the x axis) for a
-    boat of  mass m and length L. The function is adapted from the MSS. Note that in the
-    pythonVehicleSimulator the value Xudot = 0.1*mass is used instead.
+        Args:
+            q (np.ndarray): (6, ) state vector (see class description).
+            f (np.ndarray): (4, ) thrusters force vector (see class description).
+            b_current (np.ndarray): (3, ) vector of exogenous forces (see step method).
+            b_wind (np.ndarray): (3, ) vector of exogenous forces (see step method).
 
-    Args:
-        mass (float): boat mass in [kg]
-        length (float): total boat length in [m]
+        Returns:
+            q_dot (np.ndarray): (6, ) derivative of the state vector.
+        """
+        # Coriolis matrix update
+        self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (self.m_xg + self.Y_rdot) * q[5]
+        self.C[2, 1] = -(self.m + self.X_udot) * q[3]
+        self.C[0, 2] = -self.C[2, 0]
+        self.C[1, 2] = -self.C[2, 1]
 
-    Returns:
-        float: added mass in surge [kg]
-    """
+        # Nonlinear damping matrix update
+        self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate
+        D = self.D_L + self.D_NL  # pack damping matrices in a single (3, 3) matrix
 
-    rho = 1025  # default density of water [kg/m^3]
-    nabla = mass / rho  # volume displacement
+        # Compute the exogenous inputs in the local (body) reference frame
+        # TODO: add crossflow drag to represent the different effect that current and
+        # wind have depending on the side of the boat they are acting on (fron or side)
+        b_current = self.R_i2b(q[2]) @ b_current
+        b_wind = self.R_i2b(q[2]) @ b_wind
 
-    # compute the added mass in surge using the formula by Söding (1982)
-    Xudot = (2.7 * rho * nabla ** (5 / 3)) / (length**2)
+        # Dynamic equations
+        v = q[3:6]  # velocity vector [u_x, u_y, omega]
+        x_dot = self.R_b2i(q[2]) @ v[0:3]
+        v_dot = self.M_inv @ (-D @ v - self.C @ v + self.T @ f + b_current + b_wind)
 
-    return Xudot
+        # Output state derivative
+        q_dot = np.concat([x_dot, v_dot])
+        return q_dot
 
+    def thruster_dynamics(self, f: np.ndarray, u: np.ndarray) -> np.ndarray:
+        """
+        Thrusters dynamic model ODE.
 
-def crossflow_drag() -> np.ndarray:
-    """
-    Computes the forces acting on the boat due to water currents using strip theory.
-    The function is adapted from the PythonVehicleSimulator function crossFlowDrag (see
-    python_vehicle_simulator/lib/gnc.py).
+        Args:
+            f (np.ndarray): (4, ) thrusters force vector (see class description).
+            u (np.ndarray): (4, ) input force vector (see step function).
 
-    Args:
-        None
+        Returns:
+            f_dot (np.ndarray): (4, ) derivative of the thrusters force vector.
+        """
+        # Thruster dynamics (1st order system)
+        f_dot = (u - f) / self.thrust_delay
+        return f_dot
 
-    Returns:
-        np.ndarray: a (3, 1) ndarray representing the force vector due to water drag
-        acting on the center of mass of the boat
-    """
-    # TODO
+    @staticmethod
+    def R_b2i(theta: float) -> np.ndarray:
+        """
+        Computes the rotation matrix to transform coordinates from the body reference
+        frame to the inertial reference frame.
+        Args:
+            theta (float): angle in radians.
+        Returns:
+            R (np.ndarray): rotation matrix (3, 3).
+        """
+        if not isinstance(theta, float):
+            try:
+                theta = float(theta)
+            except ValueError as exc:
+                raise TypeError(
+                    "Theta must be a float or convertible to float."
+                ) from exc
+        R = np.array(
+            [
+                [np.cos(theta), -np.sin(theta), 0],
+                [np.sin(theta), np.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
+        return R
+
+    @staticmethod
+    def R_i2b(theta: float) -> np.ndarray:
+        """
+        Computes the rotation matrix to transform coordinates from the inertial
+        reference frame to the body reference frame.
+        Args:
+            theta (float): angle in radians.
+        Returns:
+            R (np.ndarray): rotation matrix (3, 3).
+        """
+        if not isinstance(theta, float):
+            try:
+                theta = float(theta)
+            except ValueError as exc:
+                raise TypeError(
+                    "Theta must be a float or convertible to float."
+                ) from exc
+        R = np.array(
+            [
+                [np.cos(theta), np.sin(theta), 0],
+                [-np.sin(theta), np.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
+        return R
+
+    def added_mass_surge(self, par: Parameters) -> float:
+        """
+        Computes an approximation of the added mass in surge (i.e., along the x axis)
+        for a boat of mass m and length L. The function is adapted from the MSS. Note
+        that in the pythonVehicleSimulator the value Xudot = 0.1*mass is used instead.
+
+        Args:
+            par (Parameters): parameters object containing the parameters for the model.
+
+        Returns:
+            float: added mass in surge [kg]
+        """
+
+        rho = 1025  # default density of water [kg/m^3]
+        nabla = par.m / rho  # volume displacement
+
+        # compute the added mass in surge using the formula by Söding (1982)
+        Xudot = (2.7 * rho * nabla ** (5 / 3)) / (par.l_tot**2)
+
+        return Xudot
+
+    def crossflow_drag(self, par: Parameters) -> np.ndarray:
+        """
+        Computes the forces acting on the boat due to water currents using strip theory.
+        The function is adapted from the PythonVehicleSimulator function crossFlowDrag
+        (see python_vehicle_simulator/lib/gnc.py).
+
+        Args:
+            par (Parameters): parameters object containing the parameters for the model.
+
+        Returns:
+            np.ndarray: a (3, 1) ndarray representing the force vector due to water drag
+            acting on the center of mass of the boat
+        """
+        raise NotImplementedError("The crossflow drag function is not implemented yet.")
+        # TODO
