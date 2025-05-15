@@ -5,8 +5,11 @@ from pickletools import optimize
 
 import numpy as np
 
+from seacat_dp.models import parameters
+
 
 def save_sim_data(
+    params: parameters.Parameters,
     q_mat: np.ndarray,
     w_mat: np.ndarray,
     q_mat_measured: np.ndarray,
@@ -18,6 +21,7 @@ def save_sim_data(
     Run all the save functions that must be executed for every simulation
 
     Args:
+        params (parameters.Parameters): parameters object
         q_mat (np.ndarray): 'real' plant output (q)
         w_mat (np.ndarray): noise (w)
         q_mat_measured (np.ndarray): plant output with noise (q + w)
@@ -41,6 +45,7 @@ def save_sim_data(
 
     # Save the simulation data
     data = {
+        "params": params,
         "q_mat": q_mat,
         "q_mat_measured": q_mat_measured,
         "w_mat": w_mat,
@@ -48,6 +53,8 @@ def save_sim_data(
         "b_current_mat": b_current_mat,
         "b_wind_mat": b_wind_mat,
     }  # Store data in a dictionary
+
+    # Write data to pickle file
     filename: str = f"results\\{sim_name}.pkl"
     pickled = pickle.dumps(data)  # Dump data dictionary in pickle file
     optimized = optimize(pickled)

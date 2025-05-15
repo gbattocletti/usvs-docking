@@ -7,6 +7,7 @@
 This repository contains a collection of dynamic models and controllers for the dynamic positioning of an autonomous Unmanned Surface Vehicle (USV). The target USV is the SeaCAT2, used in the [SeaClear2 project](https://www.seaclear2.eu/).
 
 ## Installation
+The repository is structured as a python package.
 To install, clone the repository by running:
 ```sh
 git clone https://github.com/gbattocletti/seacat2-dynamic-positioning.git
@@ -31,6 +32,11 @@ root/
 ├── .pylintrc                   # custom settings for linter
 │
 ├── scripts/                    # folder with simulation files and experiments
+│   ├── results/
+│   │   └── .pkl, .gif, ...     # saved simulation data (pickle files, gifs...)
+│   ├── sim_nl_model.py         # simulation of the nonlinear model without control
+│   ├── ...
+|   └── sim_visualization.py    # script to generate plots and animations from a sim
 │
 ├── src                         # main package (importable with -e)
 │   └── seacat_dp/              # python package name (use for import)
@@ -44,7 +50,7 @@ root/
     └── TODO
 ```
 
-All the relevant simulations are stored in the `scripts/` folder, while all the models, controllers, and required modules are stored under `src/seacat_dp`/
+All the relevant simulations are stored in the `scripts/` folder, while all the models, controllers, and required modules are stored under `src/seacat_dp/`
 
 ## License
 

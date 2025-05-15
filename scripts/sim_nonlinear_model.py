@@ -80,4 +80,4 @@ for i in range(sim_n):
     print(f"Simulation progress: {i+1}/{sim_n} [{(i+1) / sim_n * 100:.2f}%]", end="\r")
 
 # Save the simulation data
-io.save_sim_data(q_mat, w_mat, q_meas_mat, u_mat, b_current, b_wind)
+io.save_sim_data(params, q_mat, w_mat, q_meas_mat, u_mat, b_current, b_wind)
