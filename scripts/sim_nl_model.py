@@ -1,10 +1,15 @@
 import os
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from seacat_dp.models import disturbances, nonlinear_model, parameters
 from seacat_dp.utils import io
+from seacat_dp.visualization import plot_functions
+
+# Toggle plot display
+SHOW_PLOTS = True  # set to True to show plots
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent
@@ -24,8 +29,8 @@ model.set_time_step(dt)  # set the time step for the model
 model.set_integration_method("euler")  # set the integration method for the model
 model.set_initial_conditions(np.zeros(6))  # set the initial conditions for
 dist = disturbances.Disturbances()
-dist.set_current_direction(-np.pi / 4)  # set the current direction [rad]
-dist.set_current_speed(10.0)  # set the current speed [m/s]
+dist.set_current_direction(np.pi / 2)  # set the current direction [rad]
+dist.set_current_speed(1)  # set the current speed [m/s]
 dist.set_wind_direction(0.0)  # set the wind direction [rad]
 dist.set_wind_speed(0.0)  # set the wind speed [m/s]
 b_current = dist.current()  # current exogenous input (stationary, measured)
@@ -63,6 +68,12 @@ for i in range(n):
     print(f"Simulation progress: {i+1}/{n} [{(i+1) / n * 100:.2f}%]", end="\r")
 
 print("\nSimulation completed.")
+
+# Plot the simulation data
+if SHOW_PLOTS:
+    plot_functions.plot_variables(t_vec, u_mat, q_mat[:, :-1])
+    plot_functions.phase_plot(q_mat[:, :-1])
+    plt.show()
 
 # Save the simulation data
 io.save_sim_data(
