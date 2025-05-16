@@ -154,7 +154,13 @@ class NonlinearModel:
         """
         Returns a string representation of the model state.
         """
-        return f"Current state:\n\t q={self.q}\n\t f={self.f}\n\n"
+        q_str = np.array2string(
+            self.q, formatter={"float": lambda x: f"{x:.2f}"}, separator=", "
+        )
+        f_str = np.array2string(
+            self.f, formatter={"float": lambda x: f"{x:.2f}"}, separator=", "
+        )
+        return f"NL model state:\n\tq={q_str}\n\tf={f_str}"
 
     def __call__(
         self,
