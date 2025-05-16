@@ -150,6 +150,17 @@ class NonlinearModel:
             raise ValueError("Initial conditions must be a (6, ) vector.")
         self.q = q0
 
+    def get_H(self) -> np.ndarray:
+        """
+        Returns the matrix H = -M^-1 @ D_L used to build the LTI state-space model of
+        the system.
+
+        Returns:
+            H (np.ndarray): (6, 6) matrix.
+        """
+        H = -self.M_inv @ self.D_L
+        return H
+
     def __str__(self):
         """
         Returns a string representation of the model state.
