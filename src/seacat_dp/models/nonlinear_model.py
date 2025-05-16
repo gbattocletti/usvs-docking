@@ -247,10 +247,11 @@ class NonlinearModel:
             q_dot (np.ndarray): (6, ) derivative of the state vector.
         """
         # Coriolis matrix update
-        self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (self.m_xg + self.Y_rdot) * q[5]
-        self.C[2, 1] = -(self.m + self.X_udot) * q[3]
-        self.C[0, 2] = -self.C[2, 0]
-        self.C[1, 2] = -self.C[2, 1]
+        # self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (self.m_xg + self.Y_rdot)*q[5]
+        # self.C[2, 1] = -(self.m + self.X_udot) * q[3]
+        # self.C[0, 2] = -self.C[2, 0]
+        # self.C[1, 2] = -self.C[2, 1]
+        self.C = np.zeros((3, 3))  # set C matrix to zero [#CHECKME]
 
         # Nonlinear damping matrix update
         self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate
