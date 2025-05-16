@@ -4,8 +4,14 @@ from matplotlib.animation import FuncAnimation
 
 plt.rcParams["text.usetex"] = True
 
+""" 
+Useful links:
+- Matplotlib RF plot https://thomascountz.com/2018/11/18/2d-coordinate-fromes-matplotlib
+"""
+
 
 def plot_variables(t_vec, u_mat, q_mat):
+
     # Initialize plot
     fig, ax = plt.subplots(nrows=5)
     fig.suptitle("3DoF simulation")
@@ -13,25 +19,35 @@ def plot_variables(t_vec, u_mat, q_mat):
     # Plot input forces
     ax[0].plot(t_vec, u_mat[0, :])
     ax[0].plot(t_vec, u_mat[1, :])
-    ax[0].set(xlabel="", ylabel="$u$")
+    ax[0].plot(t_vec, u_mat[2, :])
+    ax[0].plot(t_vec, u_mat[3, :])
+    ax[0].set(xlabel="", ylabel="$u$ [N]")
     ax[0].grid()
+    ax[0].legend(["$u_1$", "$u_2$", "$u_3$", "$u_4$"])
 
-    # Plot x, y, theta
+    # Plot x, y
     ax[1].plot(t_vec, q_mat[0, :])
     ax[1].plot(t_vec, q_mat[1, :])
-    ax[1].set(xlabel="", ylabel="$x, y$")
+    ax[1].set(xlabel="", ylabel="$x, y$ [m]")
     ax[1].grid()
-    ax[2].plot(t_vec, q_mat[5, :])
-    ax[2].set(xlabel="", ylabel=r"$\psi$")
-    ax[2].grid()
+    ax[1].legend(["$x$", "$y$"])
 
-    # Plot vx, vy, w
-    ax[3].plot(t_vec, q_mat[6, :])
-    ax[3].plot(t_vec, q_mat[7, :])
-    ax[3].set(xlabel="", ylabel=r"$v_x, v_y$")
+    # Plot theta
+    ax[2].plot(t_vec, q_mat[2, :])
+    ax[2].set(xlabel="", ylabel=r"$\psi$ [rad]")
+    ax[2].grid()
+    ax[2].set_ylim(-np.pi, np.pi)
+
+    # Plot u, v
+    ax[3].plot(t_vec, q_mat[3, :])
+    ax[3].plot(t_vec, q_mat[4, :])
+    ax[3].set(xlabel="", ylabel=r"$u, v$ [m/s]")
     ax[3].grid()
-    ax[4].plot(t_vec, q_mat[11, :])
-    ax[4].set(xlabel="time [s]", ylabel=r"$r$")
+    ax[3].legend(["$u$", "$v$"])
+
+    # Plot omega
+    ax[4].plot(t_vec, q_mat[5, :])
+    ax[4].set(xlabel="time [s]", ylabel=r"$\omega$ [rad/s]")
     ax[4].grid()
 
 
@@ -58,7 +74,7 @@ def phase_plot(q_mat, idx=-1):
     plt.arrow(*origin, *y_arrow_fixed, head_width=0.03, color="k")
 
     # Body reference frame
-    psi = q_mat[5, idx]
+    psi = q_mat[2, idx]
     robot = q_mat[0:2, idx]
     x_arrow_body = 0.7 * x_arrow_fixed
     y_arrow_body = 0.7 * y_arrow_fixed
@@ -86,6 +102,8 @@ def phase_plot(q_mat, idx=-1):
     x = q_mat[0, :]
     y = q_mat[1, :]
     ax.plot(x, y)
+
+    # TODO: set axis limits depending on the size of the trajectory
 
 
 def animation_step(frame_idx, q_mat, arr_x, arr_y, traj, speed_up_factor):
