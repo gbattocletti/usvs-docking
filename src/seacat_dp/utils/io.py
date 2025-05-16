@@ -11,6 +11,7 @@ from seacat_dp.models import disturbances, parameters
 def save_sim_data(
     params: parameters.Parameters,
     dist: disturbances.Disturbances,
+    t_vec: np.ndarray,
     q_mat: np.ndarray,
     w_mat: np.ndarray,
     q_mat_measured: np.ndarray,
@@ -24,6 +25,7 @@ def save_sim_data(
     Args:
         params (parameters.Parameters): parameters object
         dist (disturbances.Disturbances): disturbances object
+        t_mat (np.ndarray): time vector
         q_mat (np.ndarray): 'real' plant output (q)
         w_mat (np.ndarray): noise (w)
         q_mat_measured (np.ndarray): plant output with noise (q + w)
@@ -49,6 +51,7 @@ def save_sim_data(
     data = {
         "params": params,
         "dist": dist,
+        "t_vec": t_vec,
         "q_mat": q_mat,
         "q_mat_measured": q_mat_measured,
         "w_mat": w_mat,
