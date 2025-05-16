@@ -35,27 +35,31 @@ root/
 │   ├── results/
 │   │   └── .pkl, .gif, ...     # saved simulation data (pickle files, gifs...)
 │   ├── sim_nl_model.py         # simulation of the nonlinear model without control
+│   ├── sim_sl_mpc.py           # control with successive linearization mpc
 │   ├── ...
 |   └── sim_visualization.py    # script to generate plots and animations from a sim
 │
 ├── src                         # main package (importable with -e)
 │   └── seacat_dp/              # python package name (use for import)
 │       ├── __init__.py
-│       ├── TODO
-│       └── TODO
+│       ├── models/             # usv models and parameters
+│       ├── utils/              # utilities (I/O management...)
+│       └── visualization/      # plot and animation functions
 │
-└── tests/                      # Unit/integration tests  
+└── tests/                      # unit/integration tests
     ├── __init__.py
-    ├── TODO
-    └── TODO
+    └── ...                     # TODO
 ```
 
 All the relevant simulations are stored in the `scripts/` folder, while all the models, controllers, and required modules are stored under `src/seacat_dp/`
 
+## Useful links
+- Python MSS (T. Fossen) https://github.com/cybergalactic/PythonVehicleSimulator
+- MATLAB MSS (T. Fossen) https://github.com/cybergalactic/MSS
+
 ## License
 
-The repository is provided under the GNU GPLv3 License. See the LICENSE file included with
-this repository.
+The repository is provided under the GNU GPLv3 License. See the LICENSE file included with this repository.
 
 ---
 
