@@ -5,7 +5,7 @@ from pickletools import optimize
 
 import numpy as np
 
-from seacat_dp.models import disturbances, parameters
+from seacat_dp.model import disturbances, parameters
 
 
 def save_sim_data(
