@@ -1,6 +1,6 @@
 import numpy as np
 
-from seacat_dp.models.parameters import Parameters
+from seacat_dp.model.parameters import Parameters
 
 
 class NonlinearModel:

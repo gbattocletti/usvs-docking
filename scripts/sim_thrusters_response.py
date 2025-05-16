@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from seacat_dp.models import nonlinear_model, parameters
+from seacat_dp.model import nonlinear_model, parameters
 
 # Initialize model
 param = parameters.Parameters()

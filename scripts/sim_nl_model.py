@@ -4,7 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from seacat_dp.models import disturbances, nonlinear_model, parameters
+from seacat_dp.model import disturbances, nonlinear_model, parameters
 from seacat_dp.utils import io
 from seacat_dp.visualization import plot_functions
 
