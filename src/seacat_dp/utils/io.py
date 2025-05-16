@@ -5,11 +5,12 @@ from pickletools import optimize
 
 import numpy as np
 
-from seacat_dp.models import parameters
+from seacat_dp.models import disturbances, parameters
 
 
 def save_sim_data(
     params: parameters.Parameters,
+    dist: disturbances.Disturbances,
     q_mat: np.ndarray,
     w_mat: np.ndarray,
     q_mat_measured: np.ndarray,
@@ -22,6 +23,7 @@ def save_sim_data(
 
     Args:
         params (parameters.Parameters): parameters object
+        dist (disturbances.Disturbances): disturbances object
         q_mat (np.ndarray): 'real' plant output (q)
         w_mat (np.ndarray): noise (w)
         q_mat_measured (np.ndarray): plant output with noise (q + w)
@@ -46,6 +48,7 @@ def save_sim_data(
     # Save the simulation data
     data = {
         "params": params,
+        "dist": dist,
         "q_mat": q_mat,
         "q_mat_measured": q_mat_measured,
         "w_mat": w_mat,
@@ -63,8 +66,11 @@ def save_sim_data(
 
 
 def load_sim_data(filename: str):
+
     # Create complete filename
-    filename = f"results\\{filename}.pkl"
+    if not filename.endswith(".pkl"):
+        filename = f"{filename}.pkl"  # Add .pkl extension if not present
+    filename = f"results\\{filename}"  # Add results folder path to filename
 
     # Load data
     if os.path.isfile(filename):
