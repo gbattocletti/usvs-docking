@@ -156,7 +156,7 @@ class NonlinearModel:
         the system.
 
         Returns:
-            H (np.ndarray): (6, 6) matrix.
+            H (np.ndarray): (3, 3) matrix.
         """
         H = -self.M_inv @ self.D_L
         return H
@@ -190,8 +190,8 @@ class NonlinearModel:
         Args:
             u (np.ndarray): (4, ) control input vector.
             where:
-                u[0] (float): force of the right rear thruster
-                u[1] (float): force of the left rear thruster
+                u[0] (float): force of the right stern (rear) thruster
+                u[1] (float): force of the left stern (rear) thruster
                 u[2] (float): force of the right bow thruster
                 u[3] (float): force of the left bow thruster
 
@@ -262,7 +262,7 @@ class NonlinearModel:
         # self.C[2, 1] = -(self.m + self.X_udot) * q[3]
         # self.C[0, 2] = -self.C[2, 0]
         # self.C[1, 2] = -self.C[2, 1]
-        self.C = np.zeros((3, 3))  # set C matrix to zero [#CHECKME]
+        self.C = np.zeros((3, 3))  # set C matrix to zero
 
         # Nonlinear damping matrix update
         self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate
