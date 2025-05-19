@@ -3,6 +3,7 @@ Generates the plots from a previously generated .pkl file.
 """
 
 import os
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,13 +12,27 @@ from seacat_dp.utils import io
 from seacat_dp.visualization import plot_functions
 
 # select data to visualize
-filename = "2025-05-16-0000.pkl"
+filename = None  # to manually select a file, set filename to None
+# filename = "2025-05-19-0000.pkl"
+
+# visualization options
 SHOW_PLOTS = True
 SAVE_PLOTS = False
 
-# load the simulation data
+# move to the directory of the script
 script_dir = Path(__file__).parent
 os.chdir(script_dir)
+
+# manually select a file
+if filename is None:
+    filename = io.select_file_interactively()
+    if not filename:  # User canceled the dialog
+        print("No file selected. Exiting.")
+        sys.exit(0)
+elif not filename.endswith(".pkl"):
+    filename += ".pkl"
+
+# load the simulation data
 data = io.load_sim_data(filename)
 
 # unpack the data

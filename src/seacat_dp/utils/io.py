@@ -1,7 +1,9 @@
 import os
 import pickle
+import tkinter as tk
 from datetime import datetime
 from pickletools import optimize
+from tkinter import filedialog
 
 import numpy as np
 
@@ -82,3 +84,21 @@ def load_sim_data(filename: str):
         return data
     else:
         raise FileNotFoundError(filename)
+
+
+def select_file_interactively() -> str:
+    """
+    Open a file dialog to select a .pkl file.
+
+    Returns:
+        str: The selected file name.
+    """
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    file_path = filedialog.askopenfilename(
+        initialdir="results",
+        title="Select .pkl file to visualize",
+        filetypes=[("Pickle files", "*.pkl"), ("All files", "*.*")],
+    )
+    root.destroy()
+    return os.path.basename(file_path)
