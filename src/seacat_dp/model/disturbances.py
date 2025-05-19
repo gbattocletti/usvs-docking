@@ -128,7 +128,7 @@ class Disturbances:
             b_current (np.ndarray): water current force vector [N]
         """
 
-        f_water = 10 * self.current_speed  # TODO: Look for a better relation
+        f_water = self.current_speed  # CHECKME: Look for a better relation?
         # between the water speed and the force acting on the USV to make the model more
         # realistic. For the time being, the force of the water will be assumed to be
         # known, directly proportional to the absolute water speed (rather than the
