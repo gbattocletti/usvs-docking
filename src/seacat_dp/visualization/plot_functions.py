@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
+from matplotlib.axes import Axes
+from matplotlib.lines import Line2D
+from matplotlib.patches import FancyArrow
 
 plt.rcParams["text.usetex"] = True
 
@@ -10,7 +13,24 @@ Useful links:
 """
 
 
-def plot_variables(t_vec, u_mat, q_mat):
+def plot_variables(t_vec: np.ndarray, u_mat: np.ndarray, q_mat: np.ndarray):
+    """
+    Plot the input forces and the state variables of the 3DoF simulation.
+
+    Args:
+        t_vec (numpy.ndarray): Time vector (1, N).
+        u_mat (numpy.ndarray): Input forces matrix (4, N).
+        q_mat (numpy.ndarray): State variables matrix (6, N).
+    """
+    # Check dimensions
+    n = len(t_vec)
+    if u_mat.shape[1] != n:
+        raise ValueError(f"u_mat should have shape (4, {n})")
+    if q_mat.shape[1] != n:
+        if q_mat.shape[1] == n + 1:
+            print("Warning: q_mat has one extra column. Ignoring last column.")
+            q_mat = q_mat[:, :-1]
+        raise ValueError(f"q_mat should have shape (6, {n})")
 
     # Initialize plot
     fig, ax = plt.subplots(nrows=5)
@@ -51,7 +71,14 @@ def plot_variables(t_vec, u_mat, q_mat):
     ax[4].grid()
 
 
-def initialize_phase_plot():
+def initialize_phase_plot() -> tuple[plt.Figure, Axes]:
+    """
+    Initialize the phase plot for the 3DoF simulation.
+
+    Returns:
+        fig (plt.Figure): Figure object.
+        ax (Axes): Axes object.
+    """
     # Initialize figure
     fig, ax = plt.subplots()
     ax.set_aspect("equal", "box")
@@ -62,7 +89,15 @@ def initialize_phase_plot():
     return fig, ax
 
 
-def phase_plot(q_mat, idx=-1):
+def phase_plot(q_mat: np.ndarray, idx: int = -1) -> None:
+    """
+    Plot the trajectory of the robot in the phase space (x-y plane).
+
+    Args:
+        q_mat (np.ndarray): state variables matrix (6, N).
+        idx (int, optional): index of the state at which to plot the system's body
+            reference frame. Defaults to -1.
+    """
     # Initialize figure
     _, ax = initialize_phase_plot()
 
@@ -106,7 +141,30 @@ def phase_plot(q_mat, idx=-1):
     # TODO: set axis limits depending on the size of the trajectory
 
 
-def animation_step(frame_idx, q_mat, arr_x, arr_y, traj, speed_up_factor):
+def animation_step(
+    frame_idx: int,
+    q_mat: np.ndarray,
+    arr_x: FancyArrow,
+    arr_y: FancyArrow,
+    traj: list[Line2D],
+    speed_up_factor: int,
+) -> tuple[FancyArrow, FancyArrow, list[Line2D]]:
+    """
+    Update the animation components for the animation of the phase plot.
+
+    Args:
+        frame_idx (int): Frame index.
+        q_mat (np.ndarray): State variables matrix (6, N).
+        arr_x (FancyArrow): Arrow object for x-axis.
+        arr_y (FancyArrow): Arrow object for y-axis.
+        traj (list[Line2D]): Trajectory plot object.
+        speed_up_factor (int): Speed-up factor for the animation.
+
+    Returns:
+        tuple (tuple[FancyArrow, FancyArrow, list[Line2D]]): Updated arrow objects and
+            trajectory object.
+    """
+
     # Find data index adjusted for speed-up factor
     idx = frame_idx * speed_up_factor
 
@@ -128,7 +186,24 @@ def animation_step(frame_idx, q_mat, arr_x, arr_y, traj, speed_up_factor):
     return (arr_x, arr_y, traj[0])
 
 
-def animate(filename, q_mat, speed_up_factor, save=False, show=False):
+def animate(
+    filename: str,
+    q_mat: np.ndarray,
+    speed_up_factor: int,
+    save: bool = False,
+    show: bool = False,
+) -> None:
+    """
+    Animate the trajectory of the robot in the phase space (x-y plane).
+
+    Args:
+        filename (str): Filename to save the animation.
+        q_mat (np.ndarray): State variables matrix (6, N).
+        speed_up_factor (int): Speed-up factor for the animation.
+        save (bool, optional): Whether to save the animation. Defaults to False.
+        show (bool, optional): Whether to show the animation. Defaults to False.
+    """
+
     # Initialize figure
     fig, ax = initialize_phase_plot()
     plt.xticks([])
