@@ -1,6 +1,7 @@
 import numpy as np
 
 from seacat_dp.model.parameters import Parameters
+from seacat_dp.utils.transformations import R_b2i, R_i2b
 
 
 class NonlinearModel:
@@ -271,12 +272,12 @@ class NonlinearModel:
         # Compute the exogenous inputs in the local (body) reference frame
         # TODO: add crossflow drag to represent the different effect that current and
         # wind have depending on the side of the boat they are acting on (fron or side)
-        b_current = self.R_i2b(q[2]) @ b_current
-        b_wind = self.R_i2b(q[2]) @ b_wind
+        b_current = R_i2b(q[2]) @ b_current
+        b_wind = R_i2b(q[2]) @ b_wind
 
         # Dynamic equations
         v = q[3:6]  # velocity vector [u_x, u_y, omega]
-        x_dot = self.R_b2i(q[2]) @ v[0:3]
+        x_dot = R_b2i(q[2]) @ v[0:3]
         v_dot = self.M_inv @ (-D @ v - self.C @ v + self.T @ f + b_current + b_wind)
 
         # Output state derivative
@@ -297,58 +298,6 @@ class NonlinearModel:
         # Thruster dynamics (1st order system)
         f_dot = (u - f) / self.thrust_delay
         return f_dot
-
-    @staticmethod
-    def R_b2i(theta: float) -> np.ndarray:
-        """
-        Computes the rotation matrix to transform coordinates from the body reference
-        frame to the inertial reference frame.
-        Args:
-            theta (float): angle in radians.
-        Returns:
-            R (np.ndarray): rotation matrix (3, 3).
-        """
-        if not isinstance(theta, float):
-            try:
-                theta = float(theta)
-            except ValueError as exc:
-                raise TypeError(
-                    "Theta must be a float or convertible to float."
-                ) from exc
-        R = np.array(
-            [
-                [np.cos(theta), -np.sin(theta), 0],
-                [np.sin(theta), np.cos(theta), 0],
-                [0, 0, 1],
-            ]
-        )
-        return R
-
-    @staticmethod
-    def R_i2b(theta: float) -> np.ndarray:
-        """
-        Computes the rotation matrix to transform coordinates from the inertial
-        reference frame to the body reference frame.
-        Args:
-            theta (float): angle in radians.
-        Returns:
-            R (np.ndarray): rotation matrix (3, 3).
-        """
-        if not isinstance(theta, float):
-            try:
-                theta = float(theta)
-            except ValueError as exc:
-                raise TypeError(
-                    "Theta must be a float or convertible to float."
-                ) from exc
-        R = np.array(
-            [
-                [np.cos(theta), np.sin(theta), 0],
-                [-np.sin(theta), np.cos(theta), 0],
-                [0, 0, 1],
-            ]
-        )
-        return R
 
     def added_mass_surge(self, par: Parameters) -> float:
         """

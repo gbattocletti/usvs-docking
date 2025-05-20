@@ -1,6 +1,8 @@
 import cvxpy as cp
 import numpy as np
 
+from seacat_dp.utils.transformations import R_b2i, R_i2b
+
 
 class Mpc:
     """
@@ -46,14 +48,13 @@ class Mpc:
         """
         Set the A state matrix for the MPC.
 
+        Note: The set_A method is separated from the set_B method to allow for a
+        separate call, since the A matrix is dependent on the heading angle phi and
+        is updated at each MPC solution call.
         Args:
             phi (float): The heading angle of the USV [rad] (-pi <= phi <= pi).
             H (np.ndarray): The velocities dynamic matrix H = -M^-1 * D_L (3, 3).
         """
-        # Note: The set_A method is separated from the set_B method to allow for a
-        # separate call, since the A matrix is dependent on the heading angle phi and
-        # is updated at each MPC solution call.
-
         # Validate the inputs
         if not isinstance(phi, float):
             raise ValueError("Heading angle phi must be a float.")
@@ -63,17 +64,9 @@ class Mpc:
             raise ValueError("Input matrix H must be of shape (3, 3).")
 
         # Build the A matrix
-        A = np.array(
-            [
-                [0, 0, 0, np.cos(phi), -np.cos(phi), 0],
-                [0, 0, 0, np.sin(phi), np.cos(phi), 0],
-                [0, 0, 0, 0, 0, 1],
-                [0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0],
-            ]
-        )
-        A[3:6, 3:6] = H
+        A = np.zeros((6, 6))
+        A[0:3, 3:6] = R_b2i(phi)  # Rotation matrix from body to inertial frame
+        A[3:6, 3:6] = H  # Dynamic matrix for the velocities
 
         # Set the A matrix
         self.A = A
@@ -161,13 +154,23 @@ class Mpc:
         Args:
             q0 (np.ndarray): The current state of the system (6, ).
             q_ref (np.ndarray): The desired reference state (6, ).
-            b_curr (np.ndarray): The current force (measured exogenous input).
-            b_wind (np.ndarray): The wind force (measured exogenous input).
+            b_curr (np.ndarray): The current force (measured exogenous input) expressed
+                in the inertial reference frame. b_curr is assumed to be stationary over
+                the prediction horizon
+            b_wind (np.ndarray): The wind force (measured exogenous input) expre ssed in
+                the inertial reference frame. b_wind is assumed to be stationary over
+                the prediction horizon.
 
         Returns:
             u (np.ndarray): The computed control action (4, N).
-            x (np.ndarray): The predicted state sequence (6, N + 1).
+            q (np.ndarray): The predicted state sequence (6, N + 1).
         """
+        # TO DO LIST:
+        # TODO: make q_ref a sequence of length N instead of a single value (to enable
+        # trajectory tracking in addition to setpoint tracking)
+        # TODO: add state constraints (for simple obstacle avoidance, or to add a
+        # terminal set constraint)
+
         # Validate the inputs
         if not q0.shape == (6,):
             raise ValueError("Current state q must be of shape (6, ).")
@@ -178,48 +181,42 @@ class Mpc:
         if not b_wind.shape == (3,):
             raise ValueError("Wind force b_wind must be of shape (3, ).")
 
-        # Modifications:
-        # TODO: make q_ref a sequence of length N instead of a single value
-        # TODO: add state constraints
-
         # Build the exogenous input vector
-        # CHECKME: check if the wind and current forces are in the same frame or need to
-        # be rotated. Here the wind and current forces must be in the body frame
-        # TODO: consider moving assembling the b vector to the file calling the MPC
         b = np.zeros(6)
+        b_curr = R_i2b(q0[2]) @ b_curr
+        b_wind = R_i2b(q0[2]) @ b_wind
         b[3:6] = b_curr + b_wind
 
         # Define the optimization variables
         # NOTE: we assume that input horizon and state horizon are the same (N)
         u = cp.Variable((4, self.N))
-        x = cp.Variable((6, self.N + 1))
+        q = cp.Variable((6, self.N + 1))
 
         # Cost function
         cost = 0
         for k in range(self.N):
-            q_err = x[:, k] - q_ref  # error state
+            q_err = q[:, k] - q_ref  # error state
             cost += cp.quad_form(q_err, self.Q) + cp.quad_form(u[:, k], self.R)
 
-        q_err = x[:, self.N] - q_ref  # error state
+        q_err = q[:, self.N] - q_ref  # error state
         cost += cp.quad_form(q_err, self.P)  # Terminal cost
 
         # Constraints
-        constraints = [x[:, 0] == q0]  # initial condition
+        constraints = [q[:, 0] == q0]  # initial condition
         for k in range(self.N):
             constraints += [
-                x[:, k + 1] == self.A @ x[:, k] + self.B @ u[:, k] + b,  # dynamics
+                q[:, k + 1] == self.A @ q[:, k] + self.B @ u[:, k] + b,  # dynamics
                 u[:, k] <= self.u_max,  # input upper bound
                 u[:, k] >= self.u_min,  # input lower bound
-                # state constraints (# TODO)
             ]
 
         # Solve problem
         prob = cp.Problem(cp.Minimize(cost), constraints)
-        prob.solve(solver=cp.OSQP, verbose=False)
+        prob.solve(solver=cp.OSQP, verbose=True)
 
         # Check termination status
         if prob.status != cp.OPTIMAL:
             print("Warning: MPC problem not solved to optimality")
 
         # Return the control sequence and predicted state sequence
-        return u.value, x.value
+        return u.value, q.value
