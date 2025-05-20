@@ -325,18 +325,16 @@ class NonlinearModel:
 
         return Xudot
 
-    def crossflow_drag(self, par: Parameters) -> np.ndarray:
+    def crossflow_drag(self) -> np.ndarray:
         """
         Computes the forces acting on the boat due to water currents using strip theory.
         The function is adapted from the PythonVehicleSimulator function crossFlowDrag
         (see python_vehicle_simulator/lib/gnc.py).
-
-        Args:
-            par (Parameters): parameters object containing the parameters for the model.
 
         Returns:
             np.ndarray: a (3, 1) ndarray representing the force vector due to water drag
             acting on the center of mass of the boat
         """
         raise NotImplementedError("The crossflow drag function is not implemented yet.")
-        # TODO
+        # TODO see vehicles/otter.py and lib/gnc.py in the PythonVehicleSimulator for
+        # more details.
