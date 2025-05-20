@@ -111,6 +111,7 @@ def phase_plot(q_mat: np.ndarray, idx: int = -1) -> None:
     # Body reference frame
     psi = q_mat[2, idx]
     robot = q_mat[0:2, idx]
+    robot = np.array([-robot[1], robot[0]])  # Rotate to match the inertial frame
     x_arrow_body = 0.7 * x_arrow_fixed
     y_arrow_body = 0.7 * y_arrow_fixed
     rotation = np.array([[np.cos(psi), -np.sin(psi)], [np.sin(psi), np.cos(psi)]])
@@ -133,12 +134,10 @@ def phase_plot(q_mat: np.ndarray, idx: int = -1) -> None:
         color="b",
     )
 
-    # Trajectory
-    x = q_mat[0, :]
-    y = q_mat[1, :]
+    # Trajectory (rotated to match the orientation of the inertial frame)
+    x = -q_mat[1, :]
+    y = q_mat[0, :]
     ax.plot(x, y)
-
-    # TODO: set axis limits depending on the size of the trajectory
 
 
 def animation_step(
