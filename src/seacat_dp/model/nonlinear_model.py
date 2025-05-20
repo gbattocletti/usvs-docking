@@ -20,13 +20,14 @@ class NonlinearModel:
         omega (float): angular velocity (derivative of theta)
 
     Additionally, the thruster forces are stored in the model as a (4, ) vector:
-    f (np.ndarray): [f_r, f_l, f_bow_r, f_bow_l]
+    f (np.ndarray): [f_l, f_r, f_bow_l, f_bow_r]
 
     where:
-        f_r (float): force to the right stern (rear) thruster
         f_l (float): force to the left stern (rear) thruster
-        f_bow_r (float): force to the right bow thruster
+        f_r (float): force to the right stern (rear) thruster
         f_bow_l (float): force to the left bow thruster
+        f_bow_r (float): force to the right bow thruster
+
 
     Finally, the instance attributes contain all the constant model parameters and
     matrices, which are computed at initialization time starting from the input
@@ -98,10 +99,10 @@ class NonlinearModel:
                 [1, 1, np.sin(par.alpha), np.sin(par.alpha)],
                 [0, 0, np.cos(par.alpha), -np.cos(par.alpha)],
                 [
-                    par.d_stern,
-                    -par.d_stern,
-                    par.l_bow * np.cos(par.alpha) + par.d_bow * np.sin(par.alpha),
-                    -par.l_bow * np.cos(par.alpha) - par.d_bow * np.sin(par.alpha),
+                    par.b_stern,
+                    -par.b_stern,
+                    par.l_bow * np.cos(par.alpha) + par.b_bow * np.sin(par.alpha),
+                    -par.l_bow * np.cos(par.alpha) - par.b_bow * np.sin(par.alpha),
                 ],
             ]
         )  # (3, 4) matrix
@@ -191,10 +192,10 @@ class NonlinearModel:
         Args:
             u (np.ndarray): (4, ) control input vector.
             where:
-                u[0] (float): force of the right stern (rear) thruster
-                u[1] (float): force of the left stern (rear) thruster
-                u[2] (float): force of the right bow thruster
-                u[3] (float): force of the left bow thruster
+                u[0] (float): force of the left stern (rear) thruster
+                u[1] (float): force of the right stern (rear) thruster
+                u[2] (float): force of the left bow thruster
+                u[3] (float): force of the right bow thruster
 
             b_current (np.ndarray): (3, ) vector of the water current exogenous forces
                     (measured disturbance) acting on the center of mass of the system
@@ -295,8 +296,11 @@ class NonlinearModel:
         Returns:
             f_dot (np.ndarray): (4, ) derivative of the thrusters force vector.
         """
+        # TODO: thrusters dynamics also depends on the current speed of the USV
+
         # Thruster dynamics (1st order system)
         f_dot = (u - f) / self.thrust_delay
+
         return f_dot
 
     def added_mass_surge(self, par: Parameters) -> float:

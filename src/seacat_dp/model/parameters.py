@@ -38,8 +38,8 @@ class Parameters:
 
         # Thrusters geometric data
         self.alpha: float = 15  # Bow thrusters angle from y axis [deg]
-        self.d_bow: float = 0.8  # Bow thrusters distance from x axis [m]
-        self.d_stern: float = 0.8  # Rear thrusters distance from x axis [m]
+        self.b_bow: float = 0.8  # Bow thrusters distance from x axis [m]
+        self.b_stern: float = 0.8  # Rear thrusters distance from x axis [m]
         self.l_bow: float = 2.1  # Bow thrusters distance from y axis [m]
         self.l_stern: float = 2.4  # Rear thrusters distance from y axis [m]
 
