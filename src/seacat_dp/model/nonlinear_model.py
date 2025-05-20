@@ -83,7 +83,8 @@ class NonlinearModel:
         self.C = np.zeros((3, 3))  # (3, 3) matrix
 
         # Linear damping matrix
-        self.Xu = 24.4 * par.g / par.u_max
+        # self.Xu = 24.4 * par.g / par.u_max
+        self.Xu = 1000  # [TEMP] set Xu to a constant value
         self.Yv = self.M[1, 1] / par.t_sway
         self.Nr = self.M[2, 2] / par.t_yaw
         self.D_L = np.diag([self.Xu, self.Yv, self.Nr])
@@ -260,11 +261,11 @@ class NonlinearModel:
             q_dot (np.ndarray): (6, ) derivative of the state vector.
         """
         # Coriolis matrix update
-        # self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (self.m_xg + self.Y_rdot)*q[5]
-        # self.C[2, 1] = -(self.m + self.X_udot) * q[3]
-        # self.C[0, 2] = -self.C[2, 0]
-        # self.C[1, 2] = -self.C[2, 1]
-        self.C = np.zeros((3, 3))  # set C matrix to zero
+        self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (self.m_xg + self.Y_rdot) * q[5]
+        self.C[2, 1] = -(self.m + self.X_udot) * q[3]
+        self.C[0, 2] = -self.C[2, 0]
+        self.C[1, 2] = -self.C[2, 1]
+        # self.C = np.zeros((3, 3))  # [TEMP] set C matrix to zero
 
         # Nonlinear damping matrix update
         self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate

@@ -33,8 +33,8 @@ class Parameters:
         self.I_zz: float = 2822.16
 
         # Time constants
-        self.t_sway: float = 100  # sway time constant [s]
-        self.t_yaw: float = 100  # yaw time constant [s]
+        self.t_sway: float = 1  # sway time constant [s]
+        self.t_yaw: float = 1  # yaw time constant [s]
 
         # Thrusters geometric data
         self.alpha: float = 15  # Bow thrusters angle from y axis [deg]
