@@ -31,10 +31,8 @@ model.set_initial_conditions(np.zeros(6))  # set the initial conditions for
 dist = disturbances.Disturbances()
 dist.set_current_direction(np.pi / 2)  # set the current direction [rad]
 dist.set_current_speed(1.0)  # set the current speed [m/s] (max speed is 1.0 m/s)
-dist.set_wind_direction(0.0)  # set the wind direction [rad]
-dist.set_wind_speed(0.0)  # set the wind speed [m/s]
 v_current = dist.current()  # current exogenous input (stationary, measured)
-b_wind = dist.wind()  # wind exogenous input (stationary, measured)
+b_wind = dist.wind()  # wind exogenous input (stationary, measured) [DISABLED]
 
 # Initialize variables
 q = np.zeros(6)  # state
