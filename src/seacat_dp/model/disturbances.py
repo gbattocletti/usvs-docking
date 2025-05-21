@@ -117,29 +117,23 @@ class Disturbances:
 
     def current(self) -> np.ndarray:
         """
-        Generates the water current vector b_water (exogenous input), which has sape
-        (3, ). The water current force is applied to the center of mass of the USV.
+        Generates the vector of water current speed v_current (exogenous input), which
+        has shape(3, ). The water current force is applied to the center of mass of the
+        USV and is estimated through the crossflow_drag function (strip theory).
 
         In the current implementation, the water current is assumed to be a stationary
         current field with a constant speed and direction (in the inertial reference
         frame).
 
         Returns:
-            b_current (np.ndarray): water current force vector [N]
+            v_current (np.ndarray): (3, ) water current speed vector [m/s]
         """
 
-        f_water = self.current_speed  # CHECKME: Look for a better relation?
-        # between the water speed and the force acting on the USV to make the model more
-        # realistic. For the time being, the force of the water will be assumed to be
-        # known, directly proportional to the absolute water speed (rather than the
-        # speed of the water relative to the boat), and its effect on the USV is
-        # assumed to be independent of the heading of the USV.
-
-        b_current = np.zeros(3)
-        b_current[0] = f_water * np.cos(self.current_angle)  # x component
-        b_current[1] = f_water * np.sin(self.current_angle)  # y component
-        b_current[2] = 0.0  # z component (no rotation due to water current)
-        return b_current
+        v_current = np.zeros(3)
+        v_current[0] = self.current_speed * np.cos(self.current_angle)  # x component
+        v_current[1] = self.current_speed * np.sin(self.current_angle)  # y component
+        v_current[2] = 0.0  # z component (no rotation due to water current)
+        return v_current
 
     def wind(self) -> np.ndarray:
         """

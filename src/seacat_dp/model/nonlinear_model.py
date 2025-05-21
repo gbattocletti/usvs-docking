@@ -118,6 +118,11 @@ class NonlinearModel:
         # Thrusters time delay
         self.thrust_delay = np.array([par.t_stern, par.t_stern, par.t_bow, par.t_bow])
 
+        # Draft from Fossen eq
+        self.draft_fossen = par.m / (
+            2 * par.rho * par.c_b_pontoon * par.l_pontoon * par.b_pontoon
+        )  # draft estimated from approximated submerged volume (submerged 'box')
+
     def set_time_step(self, dt: float):
         """
         Sets the time step for the model.
@@ -179,13 +184,13 @@ class NonlinearModel:
     def __call__(
         self,
         u: np.ndarray,
-        b_current: np.ndarray,
+        v_current: np.ndarray,
         b_wind: np.ndarray,
     ) -> np.ndarray:
-        return self.step(u, b_current, b_wind)
+        return self.step(u, v_current, b_wind)
 
     def step(
-        self, u: np.ndarray, b_current: np.ndarray, b_wind: np.ndarray
+        self, u: np.ndarray, v_current: np.ndarray, b_wind: np.ndarray
     ) -> np.ndarray:
         """
         Computes the next state of the model using the nonlinear dynamics.
@@ -198,13 +203,13 @@ class NonlinearModel:
                 u[2] (float): force of the left bow thruster
                 u[3] (float): force of the right bow thruster
 
-            b_current (np.ndarray): (3, ) vector of the water current exogenous forces
-                    (measured disturbance) acting on the center of mass of the system
-                    and expressed in the inertial reference frame.
+            v_current (np.ndarray): (3, ) vector of the water current speed (measured or
+                    estimated) acting on the boat [m/s]. The vector is expressed in the
+                    inertial reference frame.
             where:
-                b_current[0] (float): force along x axis
-                b_current[1] (float): force along y axis
-                b_current[2] (float): moment around z axis
+                v_current[0] (float): current speed along x axis
+                v_current[1] (float): current speed along y axis
+                v_current[2] (float): rotational speed around z axis (positive for CW)
 
             b_wind (np.ndarray): (3, ) vector of the wind exogenous forces (measured
                     disturbance) acting on the center of mass of the system and
@@ -220,7 +225,7 @@ class NonlinearModel:
 
         if self.integration_method == "euler":
             self.f = self.f + self.thruster_dynamics(self.f, u) * self.dt
-            self.q = self.q + self.dynamics(self.q, self.f, b_current, b_wind) * self.dt
+            self.q = self.q + self.dynamics(self.q, self.f, v_current, b_wind) * self.dt
 
         elif self.integration_method == "rk4":
             # thruster dynamics
@@ -231,10 +236,10 @@ class NonlinearModel:
             self.f = self.f + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
 
             # USV dynamics
-            k1 = self.dynamics(self.q, self.f, b_current, b_wind)
-            k2 = self.dynamics(self.q + k1 * self.dt / 2, self.f, b_current, b_wind)
-            k3 = self.dynamics(self.q + k2 * self.dt / 2, self.f, b_current, b_wind)
-            k4 = self.dynamics(self.q + k3 * self.dt, self.f, b_current, b_wind)
+            k1 = self.dynamics(self.q, self.f, v_current, b_wind)
+            k2 = self.dynamics(self.q + k1 * self.dt / 2, self.f, v_current, b_wind)
+            k3 = self.dynamics(self.q + k2 * self.dt / 2, self.f, v_current, b_wind)
+            k4 = self.dynamics(self.q + k3 * self.dt, self.f, v_current, b_wind)
             self.q = self.q + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
 
         else:
@@ -246,7 +251,7 @@ class NonlinearModel:
         return self.q
 
     def dynamics(
-        self, q: np.ndarray, f: np.ndarray, b_current: np.ndarray, b_wind: np.ndarray
+        self, q: np.ndarray, f: np.ndarray, v_current: np.ndarray, b_wind: np.ndarray
     ) -> np.ndarray:
         """
         SeaCat2 dynamic model ODE.
@@ -254,8 +259,10 @@ class NonlinearModel:
         Args:
             q (np.ndarray): (6, ) state vector (see class description).
             f (np.ndarray): (4, ) thrusters force vector (see class description).
-            b_current (np.ndarray): (3, ) vector of exogenous forces (see step method).
-            b_wind (np.ndarray): (3, ) vector of exogenous forces (see step method).
+            v_current (np.ndarray): (3, ) water current speed expressed in the inertial
+            frame (see step method for more details).
+            b_wind (np.ndarray): (3, ) vector of exogenous forces expressed in the
+            inertial frame (see step method for more details).
 
         Returns:
             q_dot (np.ndarray): (6, ) derivative of the state vector.
@@ -274,7 +281,7 @@ class NonlinearModel:
         # Compute the exogenous inputs in the local (body) reference frame
         # TODO: add crossflow drag to represent the different effect that current and
         # wind have depending on the side of the boat they are acting on (fron or side)
-        b_current = R_i2b(q[2]) @ b_current
+        b_current = self.crossflow_drag(v_current)  # water current drag
         b_wind = R_i2b(q[2]) @ b_wind
 
         # Dynamic equations
@@ -325,16 +332,113 @@ class NonlinearModel:
 
         return Xudot
 
-    def crossflow_drag(self) -> np.ndarray:
+    def crossflow_drag(self, v_curr: np.ndarray) -> np.ndarray:
         """
         Computes the forces acting on the boat due to water currents using strip theory.
         The function is adapted from the PythonVehicleSimulator function crossFlowDrag
-        (see python_vehicle_simulator/lib/gnc.py).
+        (see /lib/gnc.py and /vehicles/otter.py).
+
+        Note: the nominal draft is used instead of the approximated one estimated from
+        the 'box' submerged volume. This should result in a more accurate drag value.
+
+        Args:
+            v_curr (np.ndarray): (3, ) vector of the water current velocity expressed in
+                the inertial reference frame.
 
         Returns:
-            np.ndarray: a (3, 1) ndarray representing the force vector due to water drag
-            acting on the center of mass of the boat
+            tau (np.ndarray): a (3, ) ndarray representing the force vector due to water
+            drag acting on the center of mass of the boat. The force vector is expressed
+            in the body reference frame.
         """
-        raise NotImplementedError("The crossflow drag function is not implemented yet.")
-        # TODO see vehicles/otter.py and lib/gnc.py in the PythonVehicleSimulator for
-        # more details.
+        # validate input and transform to body frame
+        if v_curr.shape != (3,):
+            raise ValueError("v_curr must be a (3, ) vector.")
+        v_curr_b = R_i2b(self.q[2]) @ v_curr  # transform to body frame
+
+        # initialize strip theory parameters
+        c_d = self.hoerner()  # cross-flow drag coefficient
+        n_strips = 20  # number of strips
+        dx = self.par.l_tot / n_strips
+        x = -self.par.l_tot / 2  # strip position along the x axis
+
+        # initialize force vector
+        tau = np.zeros(3)  # force vector due to water drag acting on the center of mass
+
+        # compute the forces acting on each strip
+        for _ in range(n_strips + 1):
+            v_r_y = self.q[4] - v_curr_b[1]  # relative velocity along y axis
+            v_cf = np.abs(v_r_y) * v_r_y  # cross-flow velocity
+            tau[1] += -0.5 * self.par.rho * c_d * self.par.draft * dx * v_cf
+            tau[2] += -0.5 * self.par.rho * c_d * self.par.draft * dx * v_cf * x
+            x += dx  # move to the next strip
+
+        return tau
+
+    def hoerner(self) -> float:
+        """
+        Helper function for crossflow_drag.
+
+        Computes the 2D Hoerner cross-flow coefficient as a function of beam and draft
+        values. The data is interpolated to find the cross-flow coefficient for any
+        beam/draft pair. The function is adapted from the PythonVehicleSimulator (see
+        see /lib/gnc.py/Hoerner).
+
+        Returns:
+            float: 2D Hoerner cross-flow coefficient [-]
+        """
+
+        # DATA = [B/2T  C_D]
+        DATA_B2T = np.array(
+            [
+                0.0109,
+                0.1766,
+                0.3530,
+                0.4519,
+                0.4728,
+                0.4929,
+                0.4933,
+                0.5585,
+                0.6464,
+                0.8336,
+                0.9880,
+                1.3081,
+                1.6392,
+                1.8600,
+                2.3129,
+                2.6000,
+                3.0088,
+                3.4508,
+                3.7379,
+                4.0031,
+            ]
+        )
+        DATA_CD = np.array(
+            [
+                1.9661,
+                1.9657,
+                1.8976,
+                1.7872,
+                1.5837,
+                1.2786,
+                1.2108,
+                1.0836,
+                0.9986,
+                0.8796,
+                0.8284,
+                0.7599,
+                0.6914,
+                0.6571,
+                0.6307,
+                0.5962,
+                0.5868,
+                0.5859,
+                0.5599,
+                0.5593,
+            ]
+        )
+
+        # Interpolate the data to get the cross-flow coefficient
+        x = self.par.b_tot / (2 * self.par.draft)  # B/2T
+        h_coeff = np.interp(x, DATA_B2T, DATA_CD)
+
+        return h_coeff

@@ -30,10 +30,10 @@ model.set_integration_method("euler")  # set the integration method for the mode
 model.set_initial_conditions(np.zeros(6))  # set the initial conditions for
 dist = disturbances.Disturbances()
 dist.set_current_direction(np.pi / 2)  # set the current direction [rad]
-dist.set_current_speed(1)  # set the current speed [m/s]
+dist.set_current_speed(1.0)  # set the current speed [m/s] (max speed is 1.0 m/s)
 dist.set_wind_direction(0.0)  # set the wind direction [rad]
 dist.set_wind_speed(0.0)  # set the wind speed [m/s]
-b_current = dist.current()  # current exogenous input (stationary, measured)
+v_current = dist.current()  # current exogenous input (stationary, measured)
 b_wind = dist.wind()  # wind exogenous input (stationary, measured)
 
 # Initialize variables
@@ -41,6 +41,10 @@ q = np.zeros(6)  # state
 w = np.zeros(6)  # disturbance (CONSTANT)
 q_meas = np.zeros(6)  # measured state (CONSTANT)
 u = np.zeros(4)  # control input (CONSTANT)
+u[0] = 0  # stern left
+u[1] = 0  # stern right
+u[2] = 0  # bow left
+u[3] = 0  # bow right
 
 # Initialize time series
 q_mat = np.zeros((6, n + 1))  # state time series
@@ -53,7 +57,7 @@ print("\nSimulation started...")
 for i in range(n):
 
     # plant
-    q = model(u, b_current, b_wind)  # update the model state
+    q = model(u, v_current, b_wind)  # update the model state
 
     # store step data
     q_mat[:, i + 1] = q
@@ -77,5 +81,5 @@ if SHOW_PLOTS:
 
 # Save the simulation data
 io.save_sim_data(
-    params, dist, t_vec, q_mat, w_mat, q_meas_mat, u_mat, b_current, b_wind
+    params, dist, t_vec, q_mat, w_mat, q_meas_mat, u_mat, v_current, b_wind
 )

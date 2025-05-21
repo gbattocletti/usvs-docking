@@ -11,6 +11,7 @@ class Parameters:
 
         # General parameters
         self.g: float = 9.81  # gravity [m/s^2]
+        self.rho: float = 1026  # density of water
 
         # Geometric data
         self.l_tot: float = 5.7  # total boat length [m]
