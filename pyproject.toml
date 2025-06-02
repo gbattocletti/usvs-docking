@@ -18,6 +18,7 @@ keywords = [
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
+    "cvxpy",
     "scipy",
     "matplotlib",
 ]
