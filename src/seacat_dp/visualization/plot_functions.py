@@ -13,7 +13,13 @@ Useful links:
 """
 
 
-def plot_variables(t_vec: np.ndarray, u_mat: np.ndarray, q_mat: np.ndarray):
+def plot_variables(
+    t_vec: np.ndarray,
+    u_mat: np.ndarray,
+    q_mat: np.ndarray,
+    q_ref_mat: np.ndarray = None,
+    cost_mat: np.ndarray = None,
+) -> None:
     """
     Plot the input forces and the state variables of the 3DoF simulation.
 
@@ -21,6 +27,8 @@ def plot_variables(t_vec: np.ndarray, u_mat: np.ndarray, q_mat: np.ndarray):
         t_vec (numpy.ndarray): Time vector (1, N).
         u_mat (numpy.ndarray): Input forces matrix (4, N).
         q_mat (numpy.ndarray): State variables matrix (6, N).
+        q_ref_mat (numpy.ndarray, optional): Reference state variables matrix (6, N).
+        cost_mat (numpy.ndarray, optional): Cost matrix (1, N).
     """
     # Check dimensions
     n = len(t_vec)
@@ -31,9 +39,19 @@ def plot_variables(t_vec: np.ndarray, u_mat: np.ndarray, q_mat: np.ndarray):
             print("Warning: q_mat has one extra column. Ignoring last column.")
             q_mat = q_mat[:, :-1]
         raise ValueError(f"q_mat should have shape (6, {n})")
+    if q_ref_mat is not None and q_ref_mat.shape[1] != n:
+        if q_ref_mat.shape[1] == n + 1:
+            print("Warning: q_ref_mat has one extra column. Ignoring last column.")
+            q_ref_mat = q_ref_mat[:, :-1]
+        raise ValueError(f"q_ref_mat should have shape (6, {n})")
+    if cost_mat is not None and cost_mat.shape[0] != n:
+        raise ValueError(f"cost_mat should have shape (1, {n})")
 
     # Initialize plot
-    fig, ax = plt.subplots(nrows=5)
+    if cost_mat is not None:
+        fig, ax = plt.subplots(nrows=6, ncols=1, sharex=True)
+    else:
+        fig, ax = plt.subplots(nrows=5, ncols=1, sharex=True)
     fig.suptitle("3DoF simulation")
 
     # Plot input forces
@@ -48,12 +66,17 @@ def plot_variables(t_vec: np.ndarray, u_mat: np.ndarray, q_mat: np.ndarray):
     # Plot x, y
     ax[1].plot(t_vec, q_mat[0, :])
     ax[1].plot(t_vec, q_mat[1, :])
+    if q_ref_mat is not None:
+        ax[1].plot(t_vec, q_ref_mat[0, :], "--", color="k")
+        ax[1].plot(t_vec, q_ref_mat[1, :], "--", color="k")
     ax[1].set(xlabel="", ylabel="$x, y$ [m]")
     ax[1].grid()
     ax[1].legend(["$x$", "$y$"])
 
     # Plot theta
     ax[2].plot(t_vec, q_mat[2, :])
+    if q_ref_mat is not None:
+        ax[2].plot(t_vec, q_ref_mat[2, :], "--", color="k")
     ax[2].set(xlabel="", ylabel=r"$\psi$ [rad]")
     ax[2].grid()
     ax[2].set_ylim(-np.pi, np.pi)
@@ -69,6 +92,12 @@ def plot_variables(t_vec: np.ndarray, u_mat: np.ndarray, q_mat: np.ndarray):
     ax[4].plot(t_vec, q_mat[5, :])
     ax[4].set(xlabel="time [s]", ylabel=r"$\omega$ [rad/s]")
     ax[4].grid()
+
+    # Plot cost
+    if cost_mat is not None:
+        ax[5].plot(t_vec, cost_mat)
+        ax[5].set(xlabel="time [s]", ylabel="cost")
+        ax[5].grid()
 
 
 def initialize_phase_plot() -> tuple[plt.Figure, Axes]:
@@ -89,15 +118,25 @@ def initialize_phase_plot() -> tuple[plt.Figure, Axes]:
     return fig, ax
 
 
-def phase_plot(q_mat: np.ndarray, idx: int = -1) -> None:
+def phase_plot(q_mat: np.ndarray, idx: list[int] = None) -> None:
     """
     Plot the trajectory of the robot in the phase space (x-y plane).
 
     Args:
         q_mat (np.ndarray): state variables matrix (6, N).
-        idx (int, optional): index of the state at which to plot the system's body
-            reference frame. Defaults to -1.
+        idx (list[int], optional): list of indexes of the state at which to plot the
+            system's body reference frame. Defaults to [-1].
     """
+    # Parse input
+    if idx is None:
+        idx = [-1]
+    elif not isinstance(idx, list):
+        if isinstance(idx, int):
+            idx = [idx]
+        raise ValueError("idx must be a list of integers.")
+    elif len(idx) == 0:
+        idx = [-1]
+
     # Initialize figure
     _, ax = initialize_phase_plot()
 
@@ -108,34 +147,39 @@ def phase_plot(q_mat: np.ndarray, idx: int = -1) -> None:
     plt.arrow(*origin, *x_arrow_fixed, head_width=0.03, color="k")
     plt.arrow(*origin, *y_arrow_fixed, head_width=0.03, color="k")
 
-    # Body reference frame
-    psi = q_mat[2, idx]
-    robot = q_mat[0:2, idx]
-    robot = np.array([-robot[1], robot[0]])  # Rotate to match the inertial frame
-    x_arrow_body = 0.7 * x_arrow_fixed
-    y_arrow_body = 0.7 * y_arrow_fixed
-    rotation = np.array([[np.cos(psi), -np.sin(psi)], [np.sin(psi), np.cos(psi)]])
-    x_arrow_body = rotation.dot(x_arrow_body)
-    y_arrow_body = rotation.dot(y_arrow_body)
-    plt.arrow(
-        x=robot[0],
-        y=robot[1],
-        dx=x_arrow_body[0],
-        dy=x_arrow_body[1],
-        head_width=0.02,
-        color="b",
-    )
-    plt.arrow(
-        x=robot[0],
-        y=robot[1],
-        dx=y_arrow_body[0],
-        dy=y_arrow_body[1],
-        head_width=0.02,
-        color="b",
-    )
+    # Plot body reference frames
+    for i in idx:
+        if i >= q_mat.shape[1]:
+            raise ValueError(
+                f"Index {i} is out of bounds for q_mat with shape {q_mat.shape}."
+            )
+        psi = q_mat[2, i]
+        robot = q_mat[0:2, i]
+        robot = np.array([robot[1], robot[0]])  # Rotate to match the inertial frame
+        x_arrow_body = 0.7 * x_arrow_fixed
+        y_arrow_body = 0.7 * y_arrow_fixed
+        rotation = np.array([[np.cos(psi), -np.sin(psi)], [np.sin(psi), np.cos(psi)]])
+        x_arrow_body = rotation.dot(x_arrow_body)
+        y_arrow_body = rotation.dot(y_arrow_body)
+        plt.arrow(
+            x=robot[0],
+            y=robot[1],
+            dx=x_arrow_body[0],
+            dy=x_arrow_body[1],
+            head_width=0.02,
+            color="b",
+        )
+        plt.arrow(
+            x=robot[0],
+            y=robot[1],
+            dx=y_arrow_body[0],
+            dy=y_arrow_body[1],
+            head_width=0.02,
+            color="b",
+        )
 
     # Trajectory (rotated to match the orientation of the inertial frame)
-    x = -q_mat[1, :]
+    x = q_mat[1, :]
     y = q_mat[0, :]
     ax.plot(x, y)
 
