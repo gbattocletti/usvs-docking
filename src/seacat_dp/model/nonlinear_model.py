@@ -78,13 +78,13 @@ class NonlinearModel:
         self.M_inv = np.linalg.inv(self.M)  # (3, 3) matrix
 
         # Coriolis centripetal matrix
-        # The Coriolis matrix depends on the current USV state and is therefore updated
-        # directly in the dynamics function.
+        # NOTE: The Coriolis matrix depends on the current USV state and therefore it is
+        # updated at each time step in the dynamics function.
         self.C = np.zeros((3, 3))  # (3, 3) matrix
 
         # Linear damping matrix
         # self.Xu = 24.4 * par.g / par.u_max
-        self.Xu = 1000  # [TEMP] set Xu to a constant value
+        self.Xu = 1000  # set Xu to a constant value
         self.Yv = self.M[1, 1] / par.t_sway
         self.Nr = self.M[2, 2] / par.t_yaw
         self.D_L = np.diag([self.Xu, self.Yv, self.Nr])
@@ -158,17 +158,6 @@ class NonlinearModel:
             raise ValueError("Initial conditions must be a (6, ) vector.")
         self.q = q0
 
-    def get_H(self) -> np.ndarray:
-        """
-        Returns the matrix H = -M^-1 @ D_L used to build the LTI state-space model of
-        the system.
-
-        Returns:
-            H (np.ndarray): (3, 3) matrix.
-        """
-        H = -self.M_inv @ self.D_L
-        return H
-
     def __str__(self):
         """
         Returns a string representation of the model state.
@@ -185,12 +174,12 @@ class NonlinearModel:
         self,
         u: np.ndarray,
         v_current: np.ndarray,
-        b_wind: np.ndarray,
+        v_wind: np.ndarray,
     ) -> np.ndarray:
-        return self.step(u, v_current, b_wind)
+        return self.step(u, v_current, v_wind)
 
     def step(
-        self, u: np.ndarray, v_current: np.ndarray, b_wind: np.ndarray
+        self, u: np.ndarray, v_current: np.ndarray, v_wind: np.ndarray
     ) -> np.ndarray:
         """
         Computes the next state of the model using the nonlinear dynamics.
@@ -211,21 +200,24 @@ class NonlinearModel:
                 v_current[1] (float): current speed along y axis
                 v_current[2] (float): rotational speed around z axis (positive for CW)
 
-            b_wind (np.ndarray): (3, ) vector of the wind exogenous forces (measured
-                    disturbance) acting on the center of mass of the system and
-                    expressed in the intertial reference frame.
+            v_wind (np.ndarray): (3, ) vector of the wind speed (measured or estimated
+                    disturbance) acting on the boat [m/s]. The vector is expressed in
+                    the intertial reference frame.
             where:
-                b_wind[0] (float): force along x axis
-                b_wind[1] (float): force along y axis
-                b_wind[2] (float): moment around z axis
+                v_wind[0] (float): wind speed along x axis
+                v_wind[1] (float): wind speed along y axis
+                v_wind[2] (float): rotational speed around z axis (positive for CW)
 
         Returns:
             np.ndarray: updated state vector q.
         """
 
         if self.integration_method == "euler":
+            # thruster dynamics
             self.f = self.f + self.thruster_dynamics(self.f, u) * self.dt
-            self.q = self.q + self.dynamics(self.q, self.f, v_current, b_wind) * self.dt
+
+            # USV dynamics
+            self.q = self.q + self.dynamics(self.q, self.f, v_current, v_wind) * self.dt
 
         elif self.integration_method == "rk4":
             # thruster dynamics
@@ -236,10 +228,10 @@ class NonlinearModel:
             self.f = self.f + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
 
             # USV dynamics
-            k1 = self.dynamics(self.q, self.f, v_current, b_wind)
-            k2 = self.dynamics(self.q + k1 * self.dt / 2, self.f, v_current, b_wind)
-            k3 = self.dynamics(self.q + k2 * self.dt / 2, self.f, v_current, b_wind)
-            k4 = self.dynamics(self.q + k3 * self.dt, self.f, v_current, b_wind)
+            k1 = self.dynamics(self.q, self.f, v_current, v_wind)
+            k2 = self.dynamics(self.q + k1 * self.dt / 2, self.f, v_current, v_wind)
+            k3 = self.dynamics(self.q + k2 * self.dt / 2, self.f, v_current, v_wind)
+            k4 = self.dynamics(self.q + k3 * self.dt, self.f, v_current, v_wind)
             self.q = self.q + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
 
         else:
@@ -251,7 +243,7 @@ class NonlinearModel:
         return self.q
 
     def dynamics(
-        self, q: np.ndarray, f: np.ndarray, v_current: np.ndarray, b_wind: np.ndarray
+        self, q: np.ndarray, f: np.ndarray, v_current: np.ndarray, v_wind: np.ndarray
     ) -> np.ndarray:
         """
         SeaCat2 dynamic model ODE.
@@ -261,8 +253,8 @@ class NonlinearModel:
             f (np.ndarray): (4, ) thrusters force vector (see class description).
             v_current (np.ndarray): (3, ) water current speed expressed in the inertial
             frame (see step method for more details).
-            b_wind (np.ndarray): (3, ) vector of exogenous forces expressed in the
-            inertial frame (see step method for more details).
+            v_wind (np.ndarray): (3, ) wind speed expressed in the inertial frame (see
+            step method for more details).
 
         Returns:
             q_dot (np.ndarray): (6, ) derivative of the state vector.
@@ -272,17 +264,14 @@ class NonlinearModel:
         self.C[2, 1] = -(self.m + self.X_udot) * q[3]
         self.C[0, 2] = -self.C[2, 0]
         self.C[1, 2] = -self.C[2, 1]
-        # self.C = np.zeros((3, 3))  # [TEMP] set C matrix to zero
 
         # Nonlinear damping matrix update
         self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate
         D = self.D_L + self.D_NL  # pack damping matrices in a single (3, 3) matrix
 
         # Compute the exogenous inputs in the local (body) reference frame
-        # TODO: add crossflow drag to represent the different effect that current and
-        # wind have depending on the side of the boat they are acting on (fron or side)
         b_current = self.crossflow_drag(v_current)  # water current drag
-        b_wind = R_i2b(q[2]) @ b_wind
+        b_wind = self.wind_load(v_wind)  # wind load
 
         # Dynamic equations
         v = q[3:6]  # velocity vector [u_x, u_y, omega]
@@ -361,15 +350,23 @@ class NonlinearModel:
         dx = self.par.l_tot / n_strips
         x = -self.par.l_tot / 2  # strip position along the x axis
 
+        # compute the cross-flow velocity
+        v_r_y = self.q[4] - v_curr_b[1]  # relative velocity along y axis
+        v_cf = np.abs(v_r_y) * v_r_y  # cross-flow velocity
+
         # initialize force vector
         tau = np.zeros(3)  # force vector due to water drag acting on the center of mass
 
         # compute the forces acting on each strip
         for _ in range(n_strips + 1):
-            v_r_y = self.q[4] - v_curr_b[1]  # relative velocity along y axis
-            v_cf = np.abs(v_r_y) * v_r_y  # cross-flow velocity
+
+            # CHECKME: add some effect of the current on tau[0]?
+            # CHECKME: is tau[2] always zero in this implementation?
+
+            tau[0] += 0
             tau[1] += -0.5 * self.par.rho * c_d * self.par.draft * dx * v_cf
             tau[2] += -0.5 * self.par.rho * c_d * self.par.draft * dx * v_cf * x
+
             x += dx  # move to the next strip
 
         return tau
@@ -442,3 +439,28 @@ class NonlinearModel:
         h_coeff = np.interp(x, DATA_B2T, DATA_CD)
 
         return h_coeff
+
+    def wind_load(self, v_wind: np.ndarray) -> np.ndarray:
+        """
+        Computes the forces acting on the boat due to wind using a simple model.
+
+        Args:
+            v_wind (np.ndarray): wind speed vector expressed in the inertial reference
+            frame [m/s].
+
+        Returns:
+            b_wind (np.ndarray): a (3, ) ndarray representing the force vector due to
+            wind acting on the center of mass of the boat. The force vector is expressed
+            in the body reference frame.
+        """
+        # validate input and transform to body frame
+        if v_wind.shape != (3,):
+            raise ValueError("v_wind must be a (3, ) vector.")
+
+        # TODO: implement a more realistic wind load model
+        # NOTE: the wind load should be represented in the local (body) reference frame
+        # by rotating it with something like v_wind_b = R_i2b(self.q[2]) @ v_wind
+
+        b_wind = np.zeros(3)  # initialize wind load vector
+
+        return b_wind

@@ -13,10 +13,10 @@ class Disturbances:
         """
 
         # Measurement noise
-        self.sigma_x = 0.1  # std of the position measurement noise [m]
-        self.sigma_psi = 0.1  # std of the heading measurement noise [rad]
-        self.sigma_v = 0.1  # std of the speed measurement noise [m/s]
-        self.sigma_r = 0.1  # std of the rotation speed measurement noise [rad/s]
+        self.sigma_x = 0.01  # std of the position measurement noise [m]
+        self.sigma_psi = 0.001  # std of the heading measurement noise [rad]
+        self.sigma_v = 0.001  # std of the speed measurement noise [m/s]
+        self.sigma_r = 0.0001  # std of the rotation speed measurement noise [rad/s]
 
         # Actuation noise
         self.sigma_tau_stern = 0.1  # std of the stern actuation process noise [N]
@@ -25,13 +25,13 @@ class Disturbances:
         # Water current
         self.current_angle = 0.0  # angle of the water current with respect to the x
         # axis of the inertial reference frame [rad]
-        self.current_speed = 1.0  # speed of the water current measured in the
+        self.current_speed = 0.0  # speed of the water current measured in the
         # inertial reference frame [m/s]
 
         # Wind
         self.wind_angle = 0.0  # angle of the wind with respect to the x axis of the
         # inertial reference frame [rad]
-        self.wind_speed = 1.0  # speed of the wind measured in the inertial reference
+        self.wind_speed = 0.0  # speed of the wind measured in the inertial reference
         # frame [m/s]
 
     def __str__(self):
@@ -92,9 +92,6 @@ class Disturbances:
         """
         Generates a noise vector with the same shape as the force vector f (4, ).
         """
-        # TODO: consider moving to the model class (to be used in between the
-        # computation of the forces and the state update)
-        # TODO: check if needed (consider removing)
         noise = np.zeros(4)
         noise[0] = np.random.normal(0, self.sigma_tau_stern)
         noise[1] = np.random.normal(0, self.sigma_tau_stern)
@@ -128,7 +125,6 @@ class Disturbances:
         Returns:
             v_current (np.ndarray): (3, ) water current speed vector [m/s]
         """
-
         v_current = np.zeros(3)
         v_current[0] = self.current_speed * np.cos(self.current_angle)  # x component
         v_current[1] = self.current_speed * np.sin(self.current_angle)  # y component
@@ -137,11 +133,12 @@ class Disturbances:
 
     def wind(self) -> np.ndarray:
         """
-        Generates the wind vector b_wind (exogenous input), which has shape (3, 1).
-        The wind force is applied to the center of mass of the USV.
+        Generates the wind speed vector v_wind (measured/estimated exogenous input),
+        which has shape (3, ). The wind effect in terms of force on the USV is computed
+        in a dedicated function locatedd in the dynamics module.
 
         Returns:
-            b_wind (np.ndarray): wind force vector [N]
+            v_wind (np.ndarray): wind force vector [N]
         """
-        b_wind = np.zeros(3)
-        return b_wind
+        v_wind = np.zeros(3)
+        return v_wind

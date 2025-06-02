@@ -10,6 +10,7 @@ from seacat_dp.visualization import plot_functions
 
 # Toggle plot display
 SHOW_PLOTS = True  # set to True to show plots
+SAVE_DATA = False  # set to True to save simulation data
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent
@@ -29,8 +30,8 @@ model.set_time_step(dt)  # set the time step for the model
 model.set_integration_method("euler")  # set the integration method for the model
 model.set_initial_conditions(np.zeros(6))  # set the initial conditions for
 dist = disturbances.Disturbances()
-dist.set_current_direction(np.pi / 2)  # set the current direction [rad]
-dist.set_current_speed(1.0)  # set the current speed [m/s] (max speed is 1.0 m/s)
+dist.set_current_direction(0)  # set the current direction [rad]
+dist.set_current_speed(0)  # set the current speed [m/s] (max speed is 1.0 m/s)
 v_current = dist.current()  # current exogenous input (stationary, measured)
 b_wind = dist.wind()  # wind exogenous input (stationary, measured) [DISABLED]
 
@@ -39,8 +40,8 @@ q = np.zeros(6)  # state
 w = np.zeros(6)  # disturbance (CONSTANT)
 q_meas = np.zeros(6)  # measured state (CONSTANT)
 u = np.zeros(4)  # control input (CONSTANT)
-u[0] = 0  # stern left
-u[1] = 0  # stern right
+u[0] = 100  # stern left
+u[1] = 100  # stern right
 u[2] = 0  # bow left
 u[3] = 0  # bow right
 
@@ -78,6 +79,7 @@ if SHOW_PLOTS:
     plt.show()
 
 # Save the simulation data
-io.save_sim_data(
-    params, dist, t_vec, q_mat, w_mat, q_meas_mat, u_mat, v_current, b_wind
-)
+if SAVE_DATA:
+    io.save_sim_data(
+        params, dist, t_vec, q_mat, w_mat, q_meas_mat, u_mat, v_current, b_wind
+    )
