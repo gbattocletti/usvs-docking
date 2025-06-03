@@ -27,7 +27,6 @@ class Mpc:
         """
         # MPC parameters
         self.N: int  # control horizon
-        self.M: int = 1  # simulation steps per control step (default is 1)
         self.dt: float  # control time step [s]
         self.discretization_method: str = "euler"  # {"euler", "zoh"}
 
@@ -110,28 +109,22 @@ class Mpc:
                     UserWarning,
                 )
 
-    def set_horizon(self, N: int, M: int = 1):
+    def set_horizon(self, N: int):
         """
         Set the prediction horizon for the MPC.
 
         Args:
             N (int): The prediction horizon (int).
-            M (int): The number of simulation steps per control step (default is 1).
         """
         # Validate the input
         if not isinstance(N, int) or N <= 0:
             raise ValueError("Prediction horizon N must be a positive integer.")
-        if not isinstance(M, int) or M <= 0:
-            raise ValueError(
-                "Simulation steps per control step M must be a positive integer."
-            )
 
         # Check if the problem is already initialized
         self._warn_if_initialized()
 
         # Set the prediction horizon
         self.N = N
-        self.M = M
 
     def set_dt(self, dt: float):
         """
