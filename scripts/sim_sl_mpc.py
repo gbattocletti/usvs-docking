@@ -21,14 +21,14 @@ os.chdir(script_dir)
 
 # Simulation parameters
 sim_t = 0.0  # simulation time [s]
-sim_t_end = 60.0  # simulation duration [s]
+sim_t_end = 100.0  # simulation duration [s]
 sim_dt = 0.001  # simulation time step [s]
 sim_n = int(sim_t_end / sim_dt)  # number of time steps []
 t_vec = sim_dt * np.arange(sim_n)  # time vector [s]
-ctrl_t = 10.0  # time from the last control input [s] (used to trigger control).
+ctrl_t = 0.0  # time from the last control input [s] (used to trigger control).
 ctrl_dt = 0.5  # control time step [s]
 ctrl_n = int(ctrl_dt / sim_dt)  # time steps per control step
-ctrl_N = 50  # prediction horizon
+ctrl_N = 20  # prediction horizon
 
 # Initialize model
 params = parameters.Parameters()
@@ -36,7 +36,6 @@ plant = nonlinear_model.NonlinearModel(params)
 plant.set_time_step(sim_dt)
 plant.set_integration_method("euler")
 plant.set_initial_conditions(np.zeros(6))
-plant.thrust_delay = np.array([sim_dt, sim_dt, sim_dt, sim_dt])  # [TEMP] remove delay
 
 # Initialize disturbances
 dist = disturbances.Disturbances()
@@ -49,10 +48,10 @@ b_wind = np.zeros(6)  # wind force # [TEMP] --> get from dist.wind()
 mpc = linear_mpc.Mpc()
 mpc.set_dt(ctrl_dt)
 mpc.set_horizon(ctrl_N)
-mpc.set_discretization_method("euler")
+mpc.set_discretization_method("zoh")
 mpc.set_model(plant.M_inv, plant.D_L, plant.T, plant.q[2])
-Q = scipy.linalg.block_diag(10e3 * np.eye(2), 10e3, np.eye(2), 0.1)
-R = scipy.linalg.block_diag(10e-3 * np.eye(2), 10e-2 * np.eye(2))
+Q = scipy.linalg.block_diag(10e3 * np.eye(2), 10e3, np.eye(2), 0.1)  # pos, vel
+R = scipy.linalg.block_diag(10e-3 * np.eye(2), 10e-2 * np.eye(2))  # stern, bow
 P = Q
 mpc.set_weights(Q, R, P)
 u_max = np.array(
@@ -76,9 +75,9 @@ mpc.init_ocp()
 
 # Initialize variables
 q_ref = np.zeros(6)  # state reference
-q_ref[0] = 3.0  # [m]
-q_ref[1] = 12.0  # [m]
-q_ref[2] = 0.0  # [rad]
+q_ref[0] = 12.0  # [m]
+q_ref[1] = 3.0  # [m]
+q_ref[2] = np.pi / 6  # [rad]
 w_q = np.zeros(6)  # measurement noise
 w_u = np.zeros(4)  # actuation noise
 q_meas = np.zeros(6)  # measured state
@@ -114,7 +113,7 @@ for i in range(sim_n):
         if VERBOSE and i != 0:
             i_prev = max(0, i - ctrl_n)
             print(
-                f"t = {i_prev+1}/{sim_n} [{(i_prev+1) / sim_n * 100:.4f}%]:"
+                f"\nt = {i_prev+1}/{sim_n} [{(i_prev+1) / sim_n * 100:.4f}%]:"
                 f"\n\tq plant =\t[{q0[0]:.4f}, {q0[1]:.4f}, {q0[2]:.4f}, "
                 f"{q0[3]:.4f}, {q0[4]:.4f}, {q0[5]:.4f}]"
                 f"\n\tq+ plant =\t[{plant.q[0]:.4f}, {plant.q[1]:.4f}, "
@@ -135,19 +134,19 @@ for i in range(sim_n):
                 f"\n\tcost mpc =\t{cost:.4f}"
             )
 
-        # w = dist.measurement_noise()  # generate measurement noise
         q0 = plant.q  # save the current state (used for debug when VERBOSE)
         w_q = dist.measurement_noise()  # generate measurement noise
         q_meas = plant.q + w_q  # measure the state (with noise)
         mpc.update_model(q_meas[2])  # linearize the model around current heading
         u_vec, q_pred, cost = mpc.solve(q_meas, q_ref, b_curr, b_wind)  # solve mpc
         u = u_vec[:, 0]  # extract the first control input from the solution
-        u = np.clip(u, u_min, u_max)  # enforce input bounds
         w_u = dist.actuation_noise()  # generate actuation noise
         u = u + w_u  # add actuation noise
+        u = np.clip(u, u_min, u_max)  # enforce input bounds
         ctrl_t = 0.0  # reset the elapsed time
 
-    plant.step(u, v_curr, v_wind)  # plant time step
+    # perform one plant time step
+    plant.step(u, v_curr, v_wind)
 
     # store step data
     q_mat[:, i + 1] = plant.q
@@ -167,7 +166,6 @@ for i in range(sim_n):
             f"Simulation progress: {i+1}/{sim_n} [{(i+1) / sim_n * 100:.4f}%]", end="\r"
         )
 
-
 print("\nSimulation completed.")
 
 # Plot the simulation data
@@ -181,3 +179,5 @@ if SAVE_DATA:
     io.save_sim_data(
         params, dist, t_vec, q_mat, w_mat, q_meas_mat, u_mat, b_curr, b_wind
     )
+    print("Simulation data saved.")
+#
