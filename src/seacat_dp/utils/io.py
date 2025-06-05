@@ -14,12 +14,13 @@ def save_sim_data(
     params: parameters.Parameters,
     dist: disturbances.Disturbances,
     t_vec: np.ndarray,
+    q_ref_mat: np.ndarray,
     q_mat: np.ndarray,
     w_mat: np.ndarray,
     q_mat_measured: np.ndarray,
     u_mat: np.ndarray,
-    b_current_mat: np.ndarray,
-    b_wind_mat: np.ndarray,
+    b_current: np.ndarray,
+    b_wind: np.ndarray,
 ) -> None:
     """
     Run all the save functions that must be executed for every simulation
@@ -28,12 +29,13 @@ def save_sim_data(
         params (parameters.Parameters): parameters object
         dist (disturbances.Disturbances): disturbances object
         t_mat (np.ndarray): time vector
+        q_ref_mat (np.ndarray): reference state (q_ref)
         q_mat (np.ndarray): 'real' plant output (q)
         w_mat (np.ndarray): noise (w)
         q_mat_measured (np.ndarray): plant output with noise (q + w)
         u_mat (np.ndarray): control input (u)
-        b_current_mat (np.ndarray): current exogenous input (b_current))
-        b_wind_mat (np.ndarray): wind exogenous input (b_wind)
+        b_current (np.ndarray): current exogenous input. Assumed stationary.
+        b_wind (np.ndarray): wind exogenous input. Assumed stationary.
     Returns:
         None
     """
@@ -54,12 +56,13 @@ def save_sim_data(
         "params": params,
         "dist": dist,
         "t_vec": t_vec,
+        "q_ref_mat": q_ref_mat,
         "q_mat": q_mat,
         "q_mat_measured": q_mat_measured,
         "w_mat": w_mat,
         "u_control_mat": u_mat,
-        "b_current_mat": b_current_mat,
-        "b_wind_mat": b_wind_mat,
+        "b_current": b_current,
+        "b_wind": b_wind,
     }  # Store data in a dictionary
 
     # Write data to pickle file

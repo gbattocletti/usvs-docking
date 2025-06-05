@@ -12,12 +12,12 @@ from seacat_dp.utils import io
 from seacat_dp.visualization import plot_functions
 
 # select data to visualize
-filename = None  # to manually select a file, set filename to None
-# filename = "2025-05-19-0000.pkl"
+# filename = None  # to manually select a file, set filename to None
+filename = "2025-06-05-0006.pkl"
 
 # visualization options
-SHOW_PLOTS = True
-SAVE_PLOTS = False
+SHOW_PLOTS = False
+SAVE_PLOTS = True
 
 # move to the directory of the script
 script_dir = Path(__file__).parent
@@ -39,23 +39,34 @@ data = io.load_sim_data(filename)
 params = data["params"]
 dist = data["dist"]
 t_vec = data["t_vec"]
+q_ref_mat = data["q_ref_mat"]
 q_mat = data["q_mat"]
 q_mat = q_mat[:, :-1]  # remove the last column (future state)
 q_mat_measured = data["q_mat_measured"]
 w_mat = data["w_mat"]
 u_mat = data["u_control_mat"]
-b_current_mat = data["b_current_mat"]
-b_wind_mat = data["b_wind_mat"]
+b_current = data["b_current"]
+b_wind = data["b_wind"]
+
+# plot parameters
+anim_speed_up_factor = 100  # speed up factor for the animation
 
 # plot the simulation data
-plot_functions.plot_variables(t_vec, u_mat, q_mat)
-plot_functions.phase_plot(q_mat)
-plt.show()
+# plot_functions.plot_variables(t_vec, u_mat, q_mat)
+plot_functions.phase_plot(q_mat, b_current, b_wind)
+plot_functions.animate(
+    "results/animation.gif",
+    t_vec,
+    q_mat,
+    q_ref_mat,
+    u_mat,
+    b_current,
+    b_wind,
+    anim_speed_up_factor,
+    SAVE_PLOTS,  # save the animation
+    SHOW_PLOTS,  # show the animation
+)
 
 # show plots
 if SHOW_PLOTS:
-    pass
-
-# save plots
-if SAVE_PLOTS:
-    pass  # TODO
+    plt.show()
