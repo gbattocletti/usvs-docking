@@ -293,9 +293,21 @@ class NonlinearModel:
         Returns:
             f_dot (np.ndarray): (4, ) derivative of the thrusters force vector.
         """
-        # TODO: thrusters dynamics also depends on the current speed of the USV
+        # Validate input
+        if f.shape != (4,) or u.shape != (4,):
+            raise ValueError("f and u must be (4, ) vectors.")
 
-        # Thruster dynamics (1st order system)
+        # Thruster dynamics -- maximum force saturation as function of speed
+        # NOTE: The bow thrusters are not speed dependent, so they are not saturated.
+        # NOTE: The real characteristics of the thrusters is likely nonlinear, but it
+        # is currently unknown so a linear approximation is used instead.
+        vel_abs = np.linalg.norm(self.q[0:2])  # absolute velocity
+        f_max_forward = 1000 - 500 / 2.7 * vel_abs
+        f_max_backward = -800 + 400 / 2.7 * vel_abs
+        f[0] = np.clip(f[0], f_max_backward, f_max_forward)
+        f[1] = np.clip(f[1], f_max_backward, f_max_forward)
+
+        # Thruster dynamics -- actuation delay (1st order system)
         f_dot = (u - f) / self.thrust_delay
 
         return f_dot
