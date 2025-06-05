@@ -83,8 +83,8 @@ class Mpc:
         Args:
             q0 (np.ndarray): The current state of the system (6, ).
             q_ref (np.ndarray): The desired reference state (6, ).
-            b_curr (np.ndarray): The water current disturbance (6, ).
-            b_wind (np.ndarray): The wind disturbance (6, ).
+            b_curr (np.ndarray): The water current disturbance (3, ).
+            b_wind (np.ndarray): The wind disturbance (3, ).
 
         Returns:
             u (np.ndarray): The computed control action.
@@ -374,12 +374,12 @@ class Mpc:
         Args:
             q0 (np.ndarray): The current state of the system (6, ).
             q_ref (np.ndarray): The desired reference state (6, ).
-            b_curr (np.ndarray): The current force (6, ). The force is a measured or
-            estimated exogenous input expressed in the body reference frame (last 3
-            components), and is assumed to be stationary over the prediction horizon.
-            b_wind (np.ndarray): The wind force (6, ). The force is a measured or
-            estimated exogenous input expressed in the body reference frame (last 3
-            components), and is assumed to be stationary over the prediction horizon.
+            b_curr (np.ndarray): The current force (3, ). The force is a measured or
+            estimated exogenous input expressed in the body reference frame, and is
+            assumed to be stationary over the prediction horizon.
+            b_wind (np.ndarray): The wind force (3, ). The force is a measured or
+            estimated exogenous input expressed in the body reference frame, and is
+            assumed to be stationary over the prediction horizon.
 
         Raises:
             ValueError: If the input shapes are not as expected.
@@ -401,10 +401,10 @@ class Mpc:
             raise ValueError("Current state q must be of shape (6, ).")
         if not q_ref.shape == (6,) or q_ref.shape == (6, self.N):
             raise ValueError("Reference state q_ref must be of shape (6, ).")
-        if not b_curr.shape == (6,):
-            raise ValueError("Current force b_curr must be of shape (6, ).")
-        if not b_curr.shape == (6,):
-            raise ValueError("Current force b_curr must be of shape (6, ).")
+        if not b_curr.shape == (3,):
+            raise ValueError("Current force b_curr must be of shape (3, ).")
+        if not b_curr.shape == (3,):
+            raise ValueError("Current force b_curr must be of shape (3, ).")
 
         # Check if the optimization problem is initialized
         if not self.prob_ready:
@@ -413,8 +413,8 @@ class Mpc:
             )
 
         # Build the exogenous input vector
-        self.b_curr.value = b_curr
-        self.b_wind.value = b_wind
+        self.b_curr.value = np.hstack([np.zeros(3), b_curr])  # (6, )
+        self.b_wind.value = np.hstack([np.zeros(3), b_wind])  # (6, )
         self.q_ref.value = q_ref
         self.q0.value = q0
 
