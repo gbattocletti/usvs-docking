@@ -359,6 +359,8 @@ class NonlinearModel:
         v_curr_b = R_i2b(self.q[2]) @ v_curr
 
         # initialize strip theory parameters
+        # NOTE: we assume symmetry along the x axis, i.e., the current effect on the
+        # front and back of the boat is the same, so there is no torque (tau[2] = 0).
         c_d = self.hoerner()  # cross-flow drag coefficient
         n_strips = 20  # number of strips
         dx = self.par.l_tot / n_strips
@@ -373,9 +375,6 @@ class NonlinearModel:
 
         # compute the forces acting on each strip
         for _ in range(n_strips + 1):
-
-            # CHECKME: add some effect of the current on tau[0]?
-            # CHECKME: is tau[2] always zero in this implementation?
 
             tau[0] += 0
             tau[1] += -0.5 * self.par.rho * c_d * self.par.draft * dx * v_cf
