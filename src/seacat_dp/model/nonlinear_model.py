@@ -270,8 +270,8 @@ class NonlinearModel:
         D = self.D_L + self.D_NL  # pack damping matrices in a single (3, 3) matrix
 
         # Compute the exogenous inputs in the local (body) reference frame
-        b_current = self.crossflow_drag(v_current)  # water current drag
-        b_wind = self.wind_load(v_wind)  # wind load
+        b_current = self.crossflow_drag(v_current)  # water current load (3, )
+        b_wind = self.wind_load(v_wind)  # wind load (3, )
 
         # Dynamic equations
         v = q[3:6]  # velocity vector [u_x, u_y, omega]
@@ -339,10 +339,12 @@ class NonlinearModel:
             drag acting on the center of mass of the boat. The force vector is expressed
             in the body reference frame.
         """
-        # validate input and transform to body frame
+        # validate input
         if v_curr.shape != (3,):
             raise ValueError("v_curr must be a (3, ) vector.")
-        v_curr_b = R_i2b(self.q[2]) @ v_curr  # transform to body frame
+
+        # transform to body frame
+        v_curr_b = R_i2b(self.q[2]) @ v_curr
 
         # initialize strip theory parameters
         c_d = self.hoerner()  # cross-flow drag coefficient
@@ -453,14 +455,14 @@ class NonlinearModel:
             wind acting on the center of mass of the boat. The force vector is expressed
             in the body reference frame.
         """
-        # validate input and transform to body frame
+        # validate input
         if v_wind.shape != (3,):
             raise ValueError("v_wind must be a (3, ) vector.")
 
-        # TODO: implement a more realistic wind load model
-        # NOTE: the wind load should be represented in the local (body) reference frame
-        # by rotating it with something like v_wind_b = R_i2b(self.q[2]) @ v_wind
+        # transform to body frame
+        v_wind_b = R_i2b(self.q[2]) @ v_wind
 
-        b_wind = np.zeros(3)  # initialize wind load vector
+        # compute the wind load
+        b_wind = np.zeros(v_wind_b.shape)  # TODO: implement wind load model
 
         return b_wind
