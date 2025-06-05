@@ -51,10 +51,9 @@ def plot_variables(
 
     # Initialize plot
     if cost_mat is not None:
-        fig, ax = plt.subplots(nrows=6, ncols=1, sharex=True)
+        _, ax = plt.subplots(nrows=6, ncols=1, sharex=True)
     else:
-        fig, ax = plt.subplots(nrows=5, ncols=1, sharex=True)
-    fig.suptitle("3DoF simulation")
+        _, ax = plt.subplots(nrows=5, ncols=1, sharex=True)
 
     # Plot input forces
     ax[0].plot(t_vec, u_mat[0, :])
@@ -161,10 +160,10 @@ def phase_plot(
 
     # World reference frame
     origin = np.array([0, 0])
-    x_arrow_fixed = np.array([1, 0])
-    y_arrow_fixed = np.array([0, 1])
-    plt.arrow(*origin, *x_arrow_fixed, head_width=0.03, color="k")
-    plt.arrow(*origin, *y_arrow_fixed, head_width=0.03, color="k")
+    arrow_inertial_x = np.array([0, 1])
+    arrow_inertial_y = np.array([1, 0])
+    plt.arrow(*origin, *arrow_inertial_x, head_width=0.03, color="k")
+    plt.arrow(*origin, *arrow_inertial_y, head_width=0.03, color="k")
 
     # Plot body reference frames
     for i in idx:
@@ -174,25 +173,25 @@ def phase_plot(
             )
         psi = q_mat[2, i]
         robot = q_mat[0:2, i]
-        robot = np.array([robot[1], robot[0]])  # Rotate to match the inertial frame
-        x_arrow_body = 0.7 * x_arrow_fixed
-        y_arrow_body = 0.7 * y_arrow_fixed
+        robot = np.array([robot[1], robot[0]])
+        arrow_body_x = 0.7 * arrow_inertial_x
+        arrow_body_y = 0.7 * arrow_inertial_y
         rotation = R_i2b(psi)[0:2, 0:2]
-        x_arrow_body = rotation.dot(x_arrow_body)
-        y_arrow_body = rotation.dot(y_arrow_body)
+        arrow_body_x = rotation.dot(arrow_body_x)
+        arrow_body_y = rotation.dot(arrow_body_y)
         plt.arrow(
             x=robot[0],
             y=robot[1],
-            dx=x_arrow_body[0],
-            dy=x_arrow_body[1],
+            dx=arrow_body_x[0],
+            dy=arrow_body_x[1],
             head_width=0.02,
             color="b",
         )
         plt.arrow(
             x=robot[0],
             y=robot[1],
-            dx=y_arrow_body[0],
-            dy=y_arrow_body[1],
+            dx=arrow_body_y[0],
+            dy=arrow_body_y[1],
             head_width=0.02,
             color="b",
         )
@@ -206,8 +205,8 @@ def phase_plot(
 
     # Plot current disturbance
     if v_current is not None:
-        v_x = v_current[1] / 10
-        v_y = v_current[0] / 10
+        v_x = v_current[1]
+        v_y = v_current[0]
 
         # Repeat the same arrow (u, v) at every point
         v_x_mat = np.ones_like(X) * v_x
@@ -218,8 +217,8 @@ def phase_plot(
 
     # Plot wind disturbance
     if v_wind is not None:
-        v_x = v_wind[1] / 10
-        v_y = v_wind[0] / 10
+        v_x = v_wind[1]
+        v_y = v_wind[0]
 
         # Repeat the same arrow (u, v) at every point
         v_x_mat = np.ones_like(X) * v_x
@@ -240,11 +239,11 @@ def animation_step(
     q_mat: np.ndarray,
     q_ref_mat: np.ndarray,
     u_mat: np.ndarray,
-    arr_x: FancyArrow,
-    arr_y: FancyArrow,
-    traj: list[Line2D],
-    ref_arr_x: FancyArrow,
-    ref_arr_y: FancyArrow,
+    arr_body_x: FancyArrow,
+    arr_body_y: FancyArrow,
+    traj_body: list[Line2D],
+    arr_ref_x: FancyArrow,
+    arr_ref_y: FancyArrow,
     u_line_0: list[Line2D],
     u_line_1: list[Line2D],
     u_line_2: list[Line2D],
@@ -253,13 +252,13 @@ def animation_step(
 ) -> tuple[
     FancyArrow,
     FancyArrow,
-    list[Line2D],
+    Line2D,
     FancyArrow,
     FancyArrow,
-    list[Line2D],
-    list[Line2D],
-    list[Line2D],
-    list[Line2D],
+    Line2D,
+    Line2D,
+    Line2D,
+    Line2D,
 ]:
     """
     Update the animation components for the animation of the phase plot.
@@ -270,15 +269,15 @@ def animation_step(
         q_mat (np.ndarray): State variables matrix (6, N).
         u_mat (np.ndarray): Input forces matrix (4, N).
         q_ref_mat (np.ndarray): Reference state variables matrix (6, N).
-        arr_x (FancyArrow): Arrow object for x-axis.
-        arr_y (FancyArrow): Arrow object for y-axis.
-        traj (list[Line2D]): Trajectory plot object.
+        arr_body_x (FancyArrow): Arrow object for x-axis.
+        arr_body_y (FancyArrow): Arrow object for y-axis.
+        traj_body (Line2D): Trajectory plot object.
         arr_ref_x (FancyArrow): Arrow object for x-axis of reference RF.
         arr_ref_y (FancyArrow): Arrow object for y-axis of reference RF.
-        u_line_0 (list[Line2D]): Line object for the first input force.
-        u_line_1 (list[Line2D]): Line object for the second input force.
-        u_line_2 (list[Line2D]): Line object for the third input force.
-        u_line_3 (list[Line2D]): Line object for the fourth input force.
+        u_line_0 (Line2D): Line object for the first input force.
+        u_line_1 (Line2D): Line object for the second input force.
+        u_line_2 (Line2D): Line object for the third input force.
+        u_line_3 (Line2D): Line object for the fourth input force.
         speed_up_factor (int): Speed-up factor for the animation.
 
     Returns:
@@ -286,59 +285,65 @@ def animation_step(
     """
     # Animation plot parameters
     arr_len = 0.7
+    arr_inertial_x = arr_len * np.array([0, 1])
+    arr_inertial_y = arr_len * np.array([1, 0])
 
     # Find data index adjusted for speed-up factor
     idx = frame_idx * speed_up_factor
 
     # Update body reference frame
-    psi_body = q_mat[5, idx]
+    psi_body = q_mat[2, idx]
     R_body = R_i2b(psi_body)[0:2, 0:2]
-    x_arrow_body = R_body.dot(arr_len * np.array([1, 0]))
-    y_arrow_body = R_body.dot(arr_len * np.array([0, 1]))
-    arr_x.set_data(
-        x=q_mat[0, idx], y=q_mat[1, idx], dx=x_arrow_body[0], dy=x_arrow_body[1]
+    x_arrow_body = R_body.dot(arr_inertial_x)
+    y_arrow_body = R_body.dot(arr_inertial_y)
+    arr_body_x.set_data(
+        x=q_mat[1, idx], y=q_mat[0, idx], dx=x_arrow_body[0], dy=x_arrow_body[1]
     )
-    arr_y.set_data(
-        x=q_mat[0, idx], y=q_mat[1, idx], dx=y_arrow_body[0], dy=y_arrow_body[1]
+    arr_body_y.set_data(
+        x=q_mat[1, idx], y=q_mat[0, idx], dx=y_arrow_body[0], dy=y_arrow_body[1]
     )
 
     # Update reference reference frame
-    psi_ref = q_ref_mat[5, idx]
+    psi_ref = q_ref_mat[2, idx]
     R_ref = R_i2b(psi_ref)[0:2, 0:2]
-    x_arrow_ref = R_ref.dot(arr_len * np.array([1, 0]))
-    y_arrow_ref = R_ref.dot(arr_len * np.array([0, 1]))
-    ref_arr_x.set_data(
-        x=q_ref_mat[0, idx],
-        y=q_ref_mat[1, idx],
+    x_arrow_ref = R_ref.dot(arr_inertial_x)
+    y_arrow_ref = R_ref.dot(arr_inertial_y)
+    arr_ref_x.set_data(
+        x=q_ref_mat[1, idx],
+        y=q_ref_mat[0, idx],
         dx=x_arrow_ref[0],
         dy=x_arrow_ref[1],
     )
-    ref_arr_y.set_data(
-        x=q_ref_mat[0, idx],
-        y=q_ref_mat[1, idx],
+    arr_ref_y.set_data(
+        x=q_ref_mat[1, idx],
+        y=q_ref_mat[0, idx],
         dx=y_arrow_ref[0],
         dy=y_arrow_ref[1],
     )
 
     # Update robot trajectory
-    traj[0].set_data(q_mat[0, 0:idx], q_mat[1, 0:idx])
+    traj_body.set_data(q_mat[1, 0:idx], q_mat[0, 0:idx])
 
     # Update input forces
-    u_line_0[0].set_data(t_vec[0:frame_idx], u_mat[0, 0:frame_idx])
-    u_line_1[0].set_data(t_vec[0:frame_idx], u_mat[1, 0:frame_idx])
-    u_line_2[0].set_data(t_vec[0:frame_idx], u_mat[2, 0:frame_idx])
-    u_line_3[0].set_data(t_vec[0:frame_idx], u_mat[3, 0:frame_idx])
+    u_line_0.set_data(t_vec[0:idx], u_mat[0, 0:idx])
+    u_line_1.set_data(t_vec[0:idx], u_mat[1, 0:idx])
+    u_line_2.set_data(t_vec[0:idx], u_mat[2, 0:idx])
+    u_line_3.set_data(t_vec[0:idx], u_mat[3, 0:idx])
+
+    # Print progress
+    n = t_vec.shape[0]
+    print(f"Animation progress: {idx}/{n} [{(idx) / n * 100:.4f}%]", end="\r")
 
     return (
-        arr_x,
-        arr_y,
-        traj[0],
-        ref_arr_x,
-        ref_arr_y,
-        u_line_0[0],
-        u_line_1[0],
-        u_line_2[0],
-        u_line_3[0],
+        arr_body_x,
+        arr_body_y,
+        traj_body,
+        arr_ref_x,
+        arr_ref_y,
+        u_line_0,
+        u_line_1,
+        u_line_2,
+        u_line_3,
     )
 
 
@@ -379,75 +384,95 @@ def animate(
 
     # Initialize figure
     fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
-    plt.xticks([])
-    plt.yticks([])
+    # plt.xticks([])
+    # plt.yticks([])
 
     # Determine number of frames to generate
     N = int(np.size(q_mat, 1) / speed_up_factor)
 
     # Initialize world reference frame (static)
-    origin = np.array([0, 0])
-    x_arrow_fixed = np.array([1, 0])
-    y_arrow_fixed = np.array([0, 1])
-    plt.arrow(*origin, *x_arrow_fixed, head_width=0.03, color="k")
-    plt.arrow(*origin, *y_arrow_fixed, head_width=0.03, color="k")
+    origin_body = np.array([0, 0])
+    arrow_inertial_x = np.array([0, 1])
+    arrow_inertial_y = np.array([1, 0])
+    plt.arrow(*origin_body, *arrow_inertial_x, head_width=0.03, color="k")
+    plt.arrow(*origin_body, *arrow_inertial_y, head_width=0.03, color="k")
 
     # Create a grid of points for the vector fields
-    delta_x = 1.0
-    delta_y = 1.0
-    x = np.arange(x_min, x_max + delta_x, delta_x)
-    y = np.arange(y_min, y_max + delta_y, delta_y)
-    X, Y = np.meshgrid(x, y)
+    grid_delta_x = 1.0
+    grid_delta_y = 1.0
+    grid_x = np.arange(x_min, x_max + grid_delta_x, grid_delta_x)
+    grid_y = np.arange(y_min, y_max + grid_delta_y, grid_delta_y)
+    grid_X, grid_Y = np.meshgrid(grid_x, grid_y)
 
     # Plot current vector field (static)
     if v_current is not None:
         v_x = v_current[1]
         v_y = v_current[0]
-        v_x_mat = np.ones_like(X) * v_x
-        v_y_mat = np.ones_like(Y) * v_y
-        plt.quiver(X, Y, v_x_mat, v_y_mat, color="blue")
+        v_x_mat = np.ones_like(grid_X) * v_x
+        v_y_mat = np.ones_like(grid_Y) * v_y
+        plt.quiver(grid_X, grid_Y, v_x_mat, v_y_mat, color="blue")
 
     # Plot wind vector field (static)
     if v_wind is not None:
         v_x = v_wind[1]
         v_y = v_wind[0]
-        v_x_mat = np.ones_like(X) * v_x
-        v_y_mat = np.ones_like(Y) * v_y
-        plt.quiver(X, Y, v_x_mat, v_y_mat, color="green")
-
-    # Body reference frame (animated)
-    psi = q_mat[5, 0]
-    robot = q_mat[0:2, 0]
-    arrow_body_x = 0.7 * x_arrow_fixed
-    arrow_body_y = 0.7 * y_arrow_fixed
-    rotation = R_i2b(psi)[0:2, 0:2]
-    arrow_body_x = rotation.dot(arrow_body_x)
-    arrow_body_y = rotation.dot(arrow_body_y)
-    arr_x = plt.arrow(
-        robot[0], robot[1], arrow_body_x[0], arrow_body_x[1], head_width=0.02, color="b"
-    )
-    arr_y = plt.arrow(
-        robot[0], robot[1], arrow_body_y[0], arrow_body_y[1], head_width=0.02, color="b"
-    )
+        v_x_mat = np.ones_like(grid_X) * v_x
+        v_y_mat = np.ones_like(grid_Y) * v_y
+        plt.quiver(grid_X, grid_Y, v_x_mat, v_y_mat, color="green")
 
     # Trajectory (animated)
-    x = q_mat[0, 0]
-    y = q_mat[1, 0]
-    traj = ax.plot(x, y)
+    x = q_mat[1, 0]
+    y = q_mat[0, 0]
+    (traj_body,) = ax.plot(x, y)
+
+    # Body reference frame (animated)
+    psi_body = q_mat[2, 0]
+    origin_body = q_mat[0:2, 0]
+    arrow_body_x = 0.7 * arrow_inertial_x
+    arrow_body_y = 0.7 * arrow_inertial_y
+    R_body = R_i2b(psi_body)[0:2, 0:2]
+    arrow_body_x = R_body.dot(arrow_body_x)  # R_body @ arrow_body_x
+    arrow_body_y = R_body.dot(arrow_body_y)
+    arr_body_x = plt.arrow(
+        origin_body[0],
+        origin_body[1],
+        dx=arrow_body_x[0],
+        dy=arrow_body_x[1],
+        head_width=0.02,
+        color="b",
+    )
+    arr_body_y = plt.arrow(
+        origin_body[0],
+        origin_body[1],
+        dx=arrow_body_y[0],
+        dy=arrow_body_y[1],
+        head_width=0.02,
+        color="b",
+    )
 
     # Target reference frame (animated)
-    ref_psi = q_ref_mat[5, 0]
-    ref_O = q_ref_mat[0:2, 0]
-    arrow_ref_x = 0.7 * x_arrow_fixed
-    arrow_ref_y = 0.7 * y_arrow_fixed
-    rotation = R_i2b(ref_psi)[0:2, 0:2]
-    arrow_ref_x = rotation.dot(arrow_ref_x)
-    arrow_ref_y = rotation.dot(arrow_ref_y)
-    ref_arr_x = plt.arrow(
-        ref_O[0], ref_O[1], arrow_ref_x[0], arrow_ref_x[1], head_width=0.012, color="k"
+    psi_ref = q_ref_mat[2, 0]
+    origin_ref = q_ref_mat[0:2, 0]
+    arrow_ref_x = 0.7 * arrow_inertial_x
+    arrow_ref_y = 0.7 * arrow_inertial_y
+    R_ref = R_i2b(psi_ref)[0:2, 0:2]
+    arrow_ref_x = R_ref.dot(arrow_ref_x)
+    arrow_ref_y = R_ref.dot(arrow_ref_y)
+    arr_ref_x = plt.arrow(
+        origin_ref[0],
+        origin_ref[1],
+        dx=arrow_ref_x[0],
+        dy=arrow_ref_x[1],
+        head_width=0.012,
+        color="k",
     )
-    ref_arr_y = plt.arrow(
-        ref_O[0], ref_O[1], arrow_ref_y[0], arrow_ref_y[1], head_width=0.012, color="k"
+    arr_ref_y = plt.arrow(
+        origin_ref[0],
+        origin_ref[1],
+        dx=arrow_ref_y[0],
+        dy=arrow_ref_y[1],
+        head_width=0.012,
+        color="k",
     )
 
     # Add actuators subplot
@@ -461,10 +486,10 @@ def animate(
     ax_u.set_ylim(-1000, 1200)  # Thrusters force limits
 
     # Initialize empty lines for progressive filling
-    u_line_0 = ax_u.plot([], [], "r-", lw=2)
-    u_line_1 = ax_u.plot([], [], "r-", lw=2)
-    u_line_2 = ax_u.plot([], [], "r-", lw=2)
-    u_line_3 = ax_u.plot([], [], "r-", lw=2)
+    (u_line_0,) = ax_u.plot([], [], "r-", lw=2)
+    (u_line_1,) = ax_u.plot([], [], "r-", lw=2)
+    (u_line_2,) = ax_u.plot([], [], "r-", lw=2)
+    (u_line_3,) = ax_u.plot([], [], "r-", lw=2)
 
     # Generate the animation
     anim = FuncAnimation(
@@ -475,11 +500,11 @@ def animate(
             q_mat,
             q_ref_mat,
             u_mat,
-            arr_x,
-            arr_y,
-            traj,
-            ref_arr_x,
-            ref_arr_y,
+            arr_body_x,
+            arr_body_y,
+            traj_body,
+            arr_ref_x,
+            arr_ref_y,
             u_line_0,
             u_line_1,
             u_line_2,

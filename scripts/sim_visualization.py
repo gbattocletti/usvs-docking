@@ -13,7 +13,7 @@ from seacat_dp.visualization import plot_functions
 
 # select data to visualize
 # filename = None  # to manually select a file, set filename to None
-filename = "2025-06-05-0006.pkl"
+filename = "2025-06-05-0007.pkl"
 
 # visualization options
 SHOW_PLOTS = False
@@ -49,7 +49,7 @@ b_current = data["b_current"]
 b_wind = data["b_wind"]
 
 # plot parameters
-anim_speed_up_factor = 100  # speed up factor for the animation
+anim_speed_up_factor = 200  # speed up factor for the animation
 
 # plot the simulation data
 # plot_functions.plot_variables(t_vec, u_mat, q_mat)
