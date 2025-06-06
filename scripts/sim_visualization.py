@@ -54,7 +54,7 @@ anim_speed_up_factor = 200  # speed up factor for the animation
 # plot the simulation data
 # plot_functions.plot_variables(t_vec, u_mat, q_mat)
 plot_functions.phase_plot(q_mat, b_current, b_wind)
-plot_functions.animate(
+plot_functions.generate_animation(
     "results/animation.gif",
     t_vec,
     q_mat,

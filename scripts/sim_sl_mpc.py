@@ -1,3 +1,4 @@
+import datetime
 import os
 from pathlib import Path
 
@@ -10,9 +11,7 @@ from seacat_dp.model import disturbances, nonlinear_model, parameters
 from seacat_dp.utils import io
 from seacat_dp.visualization import plot_functions
 
-# Toggle plot display
-SHOW_PLOTS = True  # set to True to show plots
-SAVE_DATA = True  # set to True to save simulation data
+# TogSimulations settings
 VERBOSE = True  # set to True to print detailed information
 
 # Set cwd to the script directory
@@ -21,7 +20,7 @@ os.chdir(script_dir)
 
 # Simulation parameters
 sim_t = 0.0  # simulation time [s]
-sim_t_end = 60.0  # simulation duration [s]
+sim_t_end = 30.0  # simulation duration [s]
 sim_dt = 0.001  # simulation time step [s]
 sim_n = int(sim_t_end / sim_dt)  # number of time steps []
 t_vec = sim_dt * np.arange(sim_n)  # time vector [s]
@@ -39,8 +38,8 @@ plant.set_initial_conditions(np.zeros(6))
 
 # Initialize disturbances
 dist = disturbances.Disturbances()
-dist.set_current_direction(-np.pi / 4)  # [rad]
-dist.set_current_speed(0.5)  # [m/s]
+dist.set_current_direction(0.0)  # [rad] np.pi + np.pi / 6
+dist.set_current_speed(0.0)  # [m/s]
 dist.set_wind_direction(0.0)  # [rad]
 dist.set_wind_speed(0.0)  # [m/s]
 v_curr = dist.current()  # (3, ) current speed in inertial frame
@@ -49,7 +48,7 @@ b_curr = plant.crossflow_drag(v_curr)  # (3, ) current force in body frame
 b_wind = plant.wind_load(v_wind)  # (3, ) wind force in body frame
 
 # Initialize MPC controller
-mpc = linear_mpc.Mpc()
+mpc = linear_mpc.LinearMpc()
 mpc.set_dt(ctrl_dt)
 mpc.set_horizon(ctrl_N)
 mpc.set_discretization_method("zoh")
@@ -79,9 +78,9 @@ mpc.init_ocp()
 
 # Initialize variables
 q_ref = np.zeros(6)  # state reference
-q_ref[0] = -6.0  # [m]
-q_ref[1] = 0.0  # [m]
-q_ref[2] = 0.0  # [rad]
+q_ref[0] = 6.0  # [m]
+q_ref[1] = 5.0  # [m]
+q_ref[2] = np.pi / 6  # [rad]
 w_q = np.zeros(6)  # measurement noise
 w_u = np.zeros(4)  # actuation noise
 q_meas = np.zeros(6)  # measured state
@@ -97,14 +96,15 @@ q_pred = np.zeros((6, mpc.N + 1))  # predicted state (MPC solution)
 q_mat = np.zeros((6, sim_n + 1))
 q_mat[:, 0] = plant.q
 q_ref_mat = np.zeros((6, sim_n))
-w_mat = np.zeros((6, sim_n))
 q_meas_mat = np.zeros((6, sim_n))
 u_mat = np.zeros((4, sim_n))
+w_q_mat = np.zeros((6, sim_n))
+w_u_mat = np.zeros((4, sim_n))
 cost_mat = np.zeros(sim_n)
 
 
 # Run the simulation
-print("\nSimulation started...")
+print(f"\nSimulation started... [{datetime.datetime.now().strftime('%H:%M:%S')}]")
 for i in range(sim_n):
 
     # update control input
@@ -157,7 +157,8 @@ for i in range(sim_n):
     # store step data
     q_mat[:, i + 1] = plant.q
     q_ref_mat[:, i] = q_ref
-    w_mat[:, i] = w_q
+    w_q_mat[:, i] = w_q
+    w_u_mat[:, i] = w_u
     q_meas_mat[:, i] = q_meas
     u_mat[:, i] = u
     cost_mat[i] = cost
@@ -172,18 +173,40 @@ for i in range(sim_n):
             f"Simulation progress: {i+1}/{sim_n} [{(i+1) / sim_n * 100:.4f}%]", end="\r"
         )
 
-print("\nSimulation completed.")
+print(f"\nSimulation completed. [{datetime.datetime.now().strftime('%H:%M:%S')}]")
 
-# Plot the simulation data
-if SHOW_PLOTS:
-    plot_functions.plot_variables(t_vec, u_mat, q_mat[:, :-1], q_ref_mat, cost_mat)
-    plot_functions.phase_plot(q_mat[:, :-1], v_curr, v_wind)
-    plt.show()
+# Generate filename to save data
+filename = io.generate_filename()
 
-# Save the simulation data
-if SAVE_DATA:
-    io.save_sim_data(
-        params, dist, t_vec, q_ref_mat, q_mat, w_mat, q_meas_mat, u_mat, b_curr, b_wind
-    )
-    print("Simulation data saved.")
-#
+# Save simulation data
+io.save_sim_data(
+    params,
+    plant,
+    dist,
+    t_vec,
+    q_ref_mat,
+    q_mat,
+    q_meas_mat,
+    u_mat,
+    w_q_mat,
+    w_u_mat,
+    b_curr,
+    b_wind,
+    filename,
+)
+
+# Generate and save plots
+fig_variables, ax_variables = plot_functions.plot_variables(
+    t_vec, u_mat, q_mat[:, :-1], q_ref_mat, cost_mat
+)
+fig_phase, ax_phase = plot_functions.phase_plot(q_mat[:, :-1], v_curr, v_wind)
+io.save_figure(fig_variables, filename, "variables")
+io.save_figure(fig_phase, filename, "phase-plot")
+plt.show(block=False)
+
+# Generate and save animation
+speed_up_factor = 100
+anim = plot_functions.generate_animation(
+    t_vec, q_mat[:, :-1], q_ref_mat, u_mat, v_curr, v_wind, speed_up_factor
+)
+io.save_animation(anim, filename)

@@ -1,3 +1,5 @@
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
@@ -21,7 +23,7 @@ def plot_variables(
     q_mat: np.ndarray,
     q_ref_mat: np.ndarray = None,
     cost_mat: np.ndarray = None,
-) -> None:
+) -> tuple[plt.Figure, Axes]:
     """
     Plot the input forces and the state variables of the 3DoF simulation.
 
@@ -31,6 +33,15 @@ def plot_variables(
         q_mat (numpy.ndarray): State variables matrix (6, N).
         q_ref_mat (numpy.ndarray, optional): Reference state variables matrix (6, N).
         cost_mat (numpy.ndarray, optional): Cost matrix (1, N).
+
+    Raises:
+        ValueError: If the dimensions of the input matrices do not match the length of
+            the time vector.
+        UserWarning: If q_mat or q_ref_mat have one extra column, it will be ignored.
+
+    Returns:
+        fig (plt.Figure): Figure object.
+        ax (Axes): Axes object.
     """
     # Check dimensions
     n = len(t_vec)
@@ -38,12 +49,18 @@ def plot_variables(
         raise ValueError(f"u_mat should have shape (4, {n})")
     if q_mat.shape[1] != n:
         if q_mat.shape[1] == n + 1:
-            print("Warning: q_mat has one extra column. Ignoring last column.")
+            warnings.warn(
+                "Warning: q_mat has one extra column. Ignoring last column.",
+                UserWarning,
+            )
             q_mat = q_mat[:, :-1]
         raise ValueError(f"q_mat should have shape (6, {n})")
     if q_ref_mat is not None and q_ref_mat.shape[1] != n:
         if q_ref_mat.shape[1] == n + 1:
-            print("Warning: q_ref_mat has one extra column. Ignoring last column.")
+            warnings.warn(
+                "Warning: q_ref_mat has one extra column. Ignoring last column.",
+                UserWarning,
+            )
             q_ref_mat = q_ref_mat[:, :-1]
         raise ValueError(f"q_ref_mat should have shape (6, {n})")
     if cost_mat is not None and cost_mat.shape[0] != n:
@@ -51,9 +68,9 @@ def plot_variables(
 
     # Initialize plot
     if cost_mat is not None:
-        _, ax = plt.subplots(nrows=6, ncols=1, sharex=True)
+        fig, ax = plt.subplots(nrows=6, ncols=1, sharex=True)
     else:
-        _, ax = plt.subplots(nrows=5, ncols=1, sharex=True)
+        fig, ax = plt.subplots(nrows=5, ncols=1, sharex=True)
 
     # Plot input forces
     ax[0].plot(t_vec, u_mat[0, :])
@@ -100,6 +117,9 @@ def plot_variables(
         ax[5].set(xlabel="time [s]", ylabel="cost")
         ax[5].grid()
 
+    # Return figure and axes
+    return fig, ax
+
 
 def initialize_phase_plot(
     x_min: float, x_max: float, y_min: float, y_max: float
@@ -123,12 +143,13 @@ def initialize_phase_plot(
     plt.ylim(y_min, y_max)  # Set y-axis range
     ax.set(xlabel="y earth [m]", ylabel="x earth [m]")
 
+    # Return figure and axes
     return fig, ax
 
 
 def phase_plot(
     q_mat: np.ndarray, v_current: np.ndarray, v_wind: np.ndarray, idx: list[int] = None
-) -> None:
+) -> tuple[plt.Figure, Axes]:
     """
     Plot the trajectory of the robot in the phase space (x-y plane).
 
@@ -138,6 +159,10 @@ def phase_plot(
         v_wind (np.ndarray): wind speed vector (3, ). Assumed stationary.
         idx (list[int], optional): list of indexes of the state at which to plot the
             system's body reference frame. Defaults to [-1].
+
+    Returns:
+        fig (plt.Figure): Figure object.
+        ax (Axes): Axes object.
     """
     # Parse input
     if idx is None:
@@ -156,7 +181,9 @@ def phase_plot(
     y_max = np.max(q_mat[0, :]) + 1
 
     # Initialize figure
-    _, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
+    fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
+    ax.grid()
+    ax.grid(which="minor", linestyle=":", linewidth="0.5", color="gray")
 
     # World reference frame
     origin = np.array([0, 0])
@@ -204,7 +231,7 @@ def phase_plot(
     X, Y = np.meshgrid(x, y)
 
     # Plot current disturbance
-    if v_current is not None:
+    if v_current is not None and np.linalg.norm(v_current) > 0:
         v_x = v_current[1]
         v_y = v_current[0]
 
@@ -216,7 +243,7 @@ def phase_plot(
         plt.quiver(X, Y, v_x_mat, v_y_mat, color="blue")
 
     # Plot wind disturbance
-    if v_wind is not None:
+    if v_wind is not None and np.linalg.norm(v_wind) > 0:
         v_x = v_wind[1]
         v_y = v_wind[0]
 
@@ -231,6 +258,9 @@ def phase_plot(
     x = q_mat[1, :]
     y = q_mat[0, :]
     ax.plot(x, y)
+
+    # Return figure and axes
+    return fig, ax
 
 
 def animation_step(
@@ -248,6 +278,7 @@ def animation_step(
     u_line_1: list[Line2D],
     u_line_2: list[Line2D],
     u_line_3: list[Line2D],
+    title: plt.Text,
     speed_up_factor: int,
 ) -> tuple[
     FancyArrow,
@@ -259,6 +290,7 @@ def animation_step(
     Line2D,
     Line2D,
     Line2D,
+    plt.Text,
 ]:
     """
     Update the animation components for the animation of the phase plot.
@@ -278,10 +310,11 @@ def animation_step(
         u_line_1 (Line2D): Line object for the second input force.
         u_line_2 (Line2D): Line object for the third input force.
         u_line_3 (Line2D): Line object for the fourth input force.
+        title (plt.Text): Title text object for the plot.
         speed_up_factor (int): Speed-up factor for the animation.
 
     Returns:
-        (tuple): Updated arrow objects and trajectory object.
+        updated_objects (tuple): Updated arrow objects and trajectory object.
     """
     # Animation plot parameters
     arr_len = 0.7
@@ -290,6 +323,9 @@ def animation_step(
 
     # Find data index adjusted for speed-up factor
     idx = frame_idx * speed_up_factor
+
+    # Update title
+    title.set_text(f"2D Trajectory (t = {t_vec[idx]:.2f} s)")
 
     # Update body reference frame
     psi_body = q_mat[2, idx]
@@ -330,10 +366,6 @@ def animation_step(
     u_line_2.set_data(t_vec[0:idx], u_mat[2, 0:idx])
     u_line_3.set_data(t_vec[0:idx], u_mat[3, 0:idx])
 
-    # Print progress
-    n = t_vec.shape[0]
-    print(f"Animation progress: {idx}/{n} [{(idx) / n * 100:.4f}%]", end="\r")
-
     return (
         arr_body_x,
         arr_body_y,
@@ -347,8 +379,7 @@ def animation_step(
     )
 
 
-def animate(
-    filename: str,
+def generate_animation(
     t_vec: np.ndarray,
     q_mat: np.ndarray,
     q_ref_mat: np.ndarray,
@@ -356,14 +387,11 @@ def animate(
     v_current: np.ndarray,
     v_wind: np.ndarray,
     speed_up_factor: int = 1,
-    save: bool = False,
-    show: bool = False,
-) -> None:
+) -> FuncAnimation:
     """
     Animate the trajectory of the robot in the phase space (x-y plane).
 
     Args:
-        filename (str): Filename to save the animation.
         t_vec (np.ndarray): Time vector (N, ).
         q_mat (np.ndarray): State variables matrix (6, N).
         q_ref_mat (np.ndarray): Reference state variables matrix (6, N).
@@ -371,8 +399,9 @@ def animate(
         v_current (np.ndarray): Current velocity vector (3, ). Assumed stationary.
         v_wind (np.ndarray): Wind velocity vector (3, ). Assumed stationary.
         speed_up_factor (int, optional): Speed-up factor for the animation.
-        save (bool, optional): Whether to save the animation. Defaults to False.
-        show (bool, optional): Whether to show the animation. Defaults to False.
+
+    Returns:
+        anim (FuncAnimation): Animation object.
     """
 
     # Initialize figure
@@ -384,8 +413,9 @@ def animate(
 
     # Initialize figure
     fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
-    # plt.xticks([])
-    # plt.yticks([])
+    ax.grid()
+    ax.grid(which="minor", linestyle=":", linewidth="0.5", color="gray")
+    title = ax.set_title(f"2D Trajectory (t = {t_vec[0]:.2f} s)", fontsize=10)
 
     # Determine number of frames to generate
     N = int(np.size(q_mat, 1) / speed_up_factor)
@@ -405,7 +435,7 @@ def animate(
     grid_X, grid_Y = np.meshgrid(grid_x, grid_y)
 
     # Plot current vector field (static)
-    if v_current is not None:
+    if v_current is not None and np.linalg.norm(v_current) > 0:
         v_x = v_current[1]
         v_y = v_current[0]
         v_x_mat = np.ones_like(grid_X) * v_x
@@ -413,7 +443,7 @@ def animate(
         plt.quiver(grid_X, grid_Y, v_x_mat, v_y_mat, color="blue")
 
     # Plot wind vector field (static)
-    if v_wind is not None:
+    if v_wind is not None and np.linalg.norm(v_wind) > 0:
         v_x = v_wind[1]
         v_y = v_wind[0]
         v_x_mat = np.ones_like(grid_X) * v_x
@@ -484,12 +514,26 @@ def animate(
     ax_u.set_ylabel("u [N]")
     ax_u.set_xlim(0, np.max(t_vec))
     ax_u.set_ylim(-1000, 1200)  # Thrusters force limits
+    ax_u.grid()
+    ax_u.set_title("Thrusters forces", fontsize=10)
 
     # Initialize empty lines for progressive filling
-    (u_line_0,) = ax_u.plot([], [], "r-", lw=2)
-    (u_line_1,) = ax_u.plot([], [], "r-", lw=2)
-    (u_line_2,) = ax_u.plot([], [], "r-", lw=2)
-    (u_line_3,) = ax_u.plot([], [], "r-", lw=2)
+    (u_line_0,) = ax_u.plot([], [], color="darkred", lw=1)
+    (u_line_1,) = ax_u.plot([], [], color="red", lw=1)
+    (u_line_2,) = ax_u.plot([], [], color="orange", lw=1)
+    (u_line_3,) = ax_u.plot([], [], color="gold", lw=1)
+
+    # Add legend to the actuators subplot
+    ax_u.legend(
+        [
+            "$u_1$",
+            "$u_2$",
+            "$u_3$",
+            "$u_4$",
+        ],
+        loc="upper left",
+        fontsize=8,
+    )
 
     # Generate the animation
     anim = FuncAnimation(
@@ -509,6 +553,7 @@ def animate(
             u_line_1,
             u_line_2,
             u_line_3,
+            title,
             speed_up_factor,
         ),
         frames=N,
@@ -518,10 +563,4 @@ def animate(
     )
 
     # Save the animation
-    if save:
-        print("Saving animation...")
-        anim.save(filename, writer="pillow", dpi=300)
-        print("Animation saved.")
-
-    if show:
-        plt.show()
+    return anim
