@@ -15,7 +15,7 @@ from seacat_dp.utils.transformations import R_b2i
 # TODO: inherit from the base Mpc class and only update the required parts
 
 
-class NonLinear_Mpc(Mpc):
+class NonlinearMpc(Mpc):
     """
     Model Predictive Control (MPC) class for controlling a the SeaCat2. The MPC model is
     nonlinear in the A state matrix, which contains a rotation matrix.

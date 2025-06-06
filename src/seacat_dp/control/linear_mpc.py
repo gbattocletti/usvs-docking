@@ -7,7 +7,7 @@ from scipy.signal import cont2discrete
 from seacat_dp.utils.transformations import R_b2i
 
 
-class Mpc:
+class LinearMpc:
     """
     Model Predictive Control (MPC) class for controlling a system. The class assumes a
     LTI system model and implements a basic MPC algorithm.
