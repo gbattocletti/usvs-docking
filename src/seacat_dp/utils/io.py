@@ -12,8 +12,8 @@ import numpy as np
 from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 
-# from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
-from seacat_dp.model import disturbances, nonlinear_model, parameters
+from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
+from seacat_dp.model import disturbances, nonlinear_model
 
 
 def generate_filename() -> str:
@@ -41,8 +41,9 @@ def generate_filename() -> str:
 
 
 def save_sim_data(
-    params: parameters.Parameters,
+    filename: str,
     model: nonlinear_model.NonlinearModel,
+    controller: linear_mpc.LinearMpc | mpc.Mpc | nonlinear_mpc.NonlinearMpc,
     dist: disturbances.Disturbances,
     t_vec: np.ndarray,
     q_ref_mat: np.ndarray,
@@ -53,14 +54,16 @@ def save_sim_data(
     w_u_mat: np.ndarray,
     b_current: np.ndarray,
     b_wind: np.ndarray,
-    filename: str,
 ) -> None:
     """
     Run all the save functions that must be executed for every simulation
 
     Args:
-        params (parameters.Parameters): parameters object.
+        filename (str): Name of the simulation (unique identifier) to use to generate
+            the filename to save the simulation data.
         model (nonlinear_model.NonlinearModel): plant model object.
+        controller (linear_mpc.LinearMPC or mpc.MPC or nonlinear_mpc.NonlinearMPC):
+            controller object.
         dist (disturbances.Disturbances): disturbances object.
         t_vec (np.ndarray): time vector. (N, )
         q_ref_mat (np.ndarray): reference state (q_ref). (6, N)
@@ -71,7 +74,6 @@ def save_sim_data(
         w_u_mat (np.ndarray): actuation noise (w_u). (4, N)
         b_current (np.ndarray): current exogenous input. Assumed stationary. (3, )
         b_wind (np.ndarray): wind exogenous input. Assumed stationary. (3, )
-        filename (str): Name of the file to save the simulation data to.
 
     Returns:
         None
@@ -79,29 +81,74 @@ def save_sim_data(
     # Parse filename
     if not filename.startswith("results\\"):
         filename = f"results\\{filename}"
-    if not filename.endswith(".pkl"):
-        filename = f"{filename}.pkl"
+    if filename.endswith(".pkl"):
+        filename = filename.replace(".pkl", "")
+    if filename.endswith(".md"):
+        filename = filename.replace(".md", "")
+    if filename.endswith(".txt"):
+        filename = filename.replace(".txt", "")
 
-    # Save the simulation data
+    # Create filenames for different formats
+    txt_filename = f"{filename}.txt"
+    pkl_filename = f"{filename}.pkl"
+    sim_name = filename.split("\\")[-1]
+
+    # Write README file
+    with open(txt_filename, "w") as f:
+        f.write(f"# Simulation Settings {sim_name}\n")
+        f.write(f"## Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+        f.write("\n## Parameters:\n")
+        f.write(f"\t Simulation time: {t_vec[-1]:.2f} s\n")
+        f.write(f"\t Simulation time step: {t_vec[1] - t_vec[0]:.4f} s\n")  # model.dt
+        f.write(f"\t Number of time steps: {len(t_vec)}\n")
+        f.write(f"\t Integration method: {model.integration_method}\n")
+
+        f.write("\n## Controller:\n")
+        f.write(f"\t Controller type: {type(controller).__name__}\n")
+        f.write(f"\t Control time step: {controller.dt:.4f}\n")
+        f.write(f"\t Control horizon: {controller.N}\n")
+        f.write(f"\t Discretization method: {controller.discretization_method} \n")
+        # f.write(f"\t Linearization method: {controller.linearization_method} \n")
+        f.write(f"\t Q matrix: np.diag([{np.diag(controller.Q)}])\n")
+        f.write(f"\t R matrix: np.diag([{np.diag(controller.R)}])\n")
+        f.write(f"\t P matrix: np.diag([{np.diag(controller.P)}])\n")
+        f.write(f"\t u_min: {controller.u_min}\n")
+        f.write(f"\t u_max: {controller.u_max}\n")
+        if controller.delta_u_min is not None:
+            f.write(f"\t delta_u_min: {controller.delta_u_min}\n")
+        if controller.delta_u_max is not None:
+            f.write(f"\t delta_u_max: {controller.delta_u_max}\n")
+        if controller.q_min is not None:
+            f.write(f"\t q_min: {controller.q_min}\n")
+        if controller.q_max is not None:
+            f.write(f"\t q_max: {controller.q_max}\n")
+
+        f.write("\n## Disturbances:\n")
+        f.write(f"\t Current: {dist.current()} [m/s]\n")
+        f.write(f"\t Wind: {dist.wind()} [m/s]\n")
+
+        f.write("\n## Initial conditions and goal:\n")
+        f.write(f"\t Initial state: {q_mat[:, 0]}\n")
+        f.write(f"\t Goal state: {q_ref_mat[:, 0]} (initial goal)\n")
+
+    # Collect the timeseries data in a dictionary to be saved in a pickle file
     data = {
-        "params": params,
-        "plant": model,
-        "disturbances": dist,
         "t_vec": t_vec,
         "q_ref_mat": q_ref_mat,
         "q_mat": q_mat,
         "q_mat_measured": q_meas_mat,
         "w_q_mat": w_q_mat,
-        "w_u_mat": w_u_mat,
         "u_control_mat": u_mat,
+        "w_u_mat": w_u_mat,
         "b_current": b_current,
         "b_wind": b_wind,
-    }  # Store data in a dictionary
+    }
 
     # Write data to pickle file
     pickled = pickle.dumps(data)  # Dump data dictionary in pickle file
     optimized = optimize(pickled)
-    with open(filename, "wb") as f:
+    with open(pkl_filename, "wb") as f:
         f.write(optimized)
 
     print("Simulation data saved.")
@@ -193,7 +240,7 @@ def save_animation(anim: FuncAnimation, filename: str) -> None:
 
     # Save animation
     total_frames = anim._save_count  # pylint: disable=protected-access
-    with tqdm(total=total_frames, desc="Saving animation") as pbar:
+    with tqdm(total=total_frames, desc="Generating animation") as pbar:
         anim.save(
             filename,
             writer="pillow",  # or "ffmpeg" for MP4

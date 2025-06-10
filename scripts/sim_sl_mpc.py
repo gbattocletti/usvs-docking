@@ -13,6 +13,7 @@ from seacat_dp.visualization import plot_functions
 
 # TogSimulations settings
 VERBOSE = True  # set to True to print detailed information
+SHOW_PLOTS = False  # set to True to show plots at the end of the simulation
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent
@@ -20,26 +21,26 @@ os.chdir(script_dir)
 
 # Simulation parameters
 sim_t = 0.0  # simulation time [s]
-sim_t_end = 30.0  # simulation duration [s]
+sim_t_end = 120.0  # simulation duration [s]
 sim_dt = 0.001  # simulation time step [s]
 sim_n = int(sim_t_end / sim_dt)  # number of time steps []
 t_vec = sim_dt * np.arange(sim_n)  # time vector [s]
 ctrl_t = 0.0  # time from the last control input [s] (used to trigger control).
 ctrl_dt = 0.5  # control time step [s]
 ctrl_n = int(ctrl_dt / sim_dt)  # time steps per control step
-ctrl_N = 20  # prediction horizon
+ctrl_N = 30  # prediction horizon
 
 # Initialize model
 params = parameters.Parameters()
 plant = nonlinear_model.NonlinearModel(params)
 plant.set_time_step(sim_dt)
-plant.set_integration_method("euler")
+plant.set_integration_method("rk4")
 plant.set_initial_conditions(np.zeros(6))
 
 # Initialize disturbances
 dist = disturbances.Disturbances()
-dist.set_current_direction(0.0)  # [rad] np.pi + np.pi / 6
-dist.set_current_speed(0.0)  # [m/s]
+dist.set_current_direction(np.pi + np.pi / 3.0)  # [rad]
+dist.set_current_speed(0.2)  # [m/s]
 dist.set_wind_direction(0.0)  # [rad]
 dist.set_wind_speed(0.0)  # [m/s]
 v_curr = dist.current()  # (3, ) current speed in inertial frame
@@ -53,8 +54,8 @@ mpc.set_dt(ctrl_dt)
 mpc.set_horizon(ctrl_N)
 mpc.set_discretization_method("zoh")
 mpc.set_model(plant.M_inv, plant.D_L, plant.T, plant.q[2])
-Q = scipy.linalg.block_diag(10e3 * np.eye(2), 10e3, np.eye(2), 0.1)  # pos, vel
-R = scipy.linalg.block_diag(10e-3 * np.eye(2), 10e-2 * np.eye(2))  # stern, bow
+Q = scipy.linalg.block_diag(10e3 * np.eye(2), 10e1, np.eye(2), 0.01)  # pos, vel
+R = scipy.linalg.block_diag(10e-3 * np.eye(2), 5 * 10e-1 * np.eye(2))  # stern, bow
 P = Q
 mpc.set_weights(Q, R, P)
 u_max = np.array(
@@ -96,8 +97,8 @@ mpc.init_ocp()
 # Initialize variables
 q_ref = np.zeros(6)  # state reference
 q_ref[0] = 6.0  # [m]
-q_ref[1] = 5.0  # [m]
-q_ref[2] = np.pi / 6  # [rad]
+q_ref[1] = -3.0  # [m]
+q_ref[2] = np.pi / 3  # [rad]
 w_q = np.zeros(6)  # measurement noise
 w_u = np.zeros(4)  # actuation noise
 q_meas = np.zeros(6)  # measured state
@@ -197,8 +198,9 @@ filename = io.generate_filename()
 
 # Save simulation data
 io.save_sim_data(
-    params,
+    filename,
     plant,
+    mpc,
     dist,
     t_vec,
     q_ref_mat,
@@ -209,7 +211,6 @@ io.save_sim_data(
     w_u_mat,
     b_curr,
     b_wind,
-    filename,
 )
 
 # Generate and save plots
@@ -219,7 +220,9 @@ fig_variables, ax_variables = plot_functions.plot_variables(
 fig_phase, ax_phase = plot_functions.phase_plot(q_mat[:, :-1], v_curr, v_wind)
 io.save_figure(fig_variables, filename, "variables")
 io.save_figure(fig_phase, filename, "phase-plot")
-plt.show(block=False)
+
+if SHOW_PLOTS == True:
+    plt.show(block=False)
 
 # Generate and save animation
 speed_up_factor = 100
