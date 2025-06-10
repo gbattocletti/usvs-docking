@@ -74,6 +74,23 @@ u_min = np.array(
     ]
 )
 mpc.set_input_bounds(u_min, u_max)
+delta_u_max = np.array(
+    [
+        params.max_stern_thrust_forward / params.t_stern * ctrl_dt,
+        params.max_stern_thrust_forward / params.t_stern * ctrl_dt,
+        params.max_bow_thrust_forward / params.t_bow * ctrl_dt,
+        params.max_bow_thrust_forward / params.t_bow * ctrl_dt,
+    ]
+)  # [N/s]
+delta_u_min = np.array(
+    [
+        params.max_stern_thrust_backward / params.t_stern * ctrl_dt,
+        params.max_stern_thrust_backward / params.t_stern * ctrl_dt,
+        params.max_bow_thrust_backward / params.t_bow * ctrl_dt,
+        params.max_bow_thrust_backward / params.t_bow * ctrl_dt,
+    ]
+)  # [N/s]
+mpc.set_input_rate_bounds(delta_u_min / 5, delta_u_max / 5)
 mpc.init_ocp()
 
 # Initialize variables

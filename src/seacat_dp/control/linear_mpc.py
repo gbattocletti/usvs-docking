@@ -45,11 +45,13 @@ class LinearMpc:
         self.R: np.ndarray
         self.P: np.ndarray
 
-        # Input and state bounds
-        self.u_min: np.ndarray
-        self.u_max: np.ndarray
-        self.q_min: np.ndarray
-        self.q_max: np.ndarray
+        # Input and state bounds (optional)
+        self.u_min: np.ndarray = None
+        self.u_max: np.ndarray = None
+        self.delta_u_max: np.ndarray = None
+        self.delta_u_min: np.ndarray = None
+        self.q_min: np.ndarray = None
+        self.q_max: np.ndarray = None
 
         # Optimization variables
         self.u: cp.Variable
@@ -98,7 +100,8 @@ class LinearMpc:
             if self.init_ocp_automatically:
                 warnings.warn(
                     "Warning: MPC problem is already initialized. Reinitializing it to "
-                    "apply the changes."
+                    "apply the changes.",
+                    UserWarning,
                 )
                 self.init_ocp()
             else:
@@ -209,6 +212,36 @@ class LinearMpc:
         # Set the input bounds
         self.u_min = u_min
         self.u_max = u_max
+
+    def set_input_rate_bounds(self, delta_u_min: np.ndarray, delta_u_max: np.ndarray):
+        """
+        Set the input rate bounds for the MPC. These bounds are used to limit the rate
+        of change of the control inputs, and take into account the actuaor dynamics in
+        the control problem.
+
+        Args:
+            delta_u_min (np.ndarray): The minimum input rate bounds (4, ).
+            delta_u_max (np.ndarray): The maximum input rate bounds (4, ).
+
+        Raises:
+            ValueError: If the input shapes are not as expected.
+        """
+        # Validate the inputs
+        if not delta_u_min.shape == (4,):
+            raise ValueError(
+                "Minimum input rate bounds delta_u_min must be of shape (4, )."
+            )
+        if not delta_u_max.shape == (4,):
+            raise ValueError(
+                "Maximum input rate bounds delta_u_max must be of shape (4, )."
+            )
+
+        # Check if the problem is already initialized
+        self._warn_if_initialized()
+
+        # Set the input rate bounds
+        self.delta_u_min = delta_u_min
+        self.delta_u_max = delta_u_max
 
     def set_state_bounds(self, q_min: np.ndarray, q_max: np.ndarray):
         """
@@ -322,6 +355,11 @@ class LinearMpc:
                 "Input bounds u_min and u_max are not set. Call set_input_bounds() "
                 "first."
             )
+        if self.delta_u_max is None or self.delta_u_min is None:
+            raise ValueError(
+                "Input rate bounds delta_u_max and delta_u_min are not set. "
+                "Call set_input_bounds() first."
+            )
 
         # Initialize the optimization variables
         # NOTE: we assume that control horizon and prediction horizon are the same (N)
@@ -335,18 +373,30 @@ class LinearMpc:
             cost += cp.quad_form(self.u[:, k], self.R)  # input cost
         cost += cp.quad_form(self.q[:, self.N] - self.q_ref, self.P)  # Terminal cost
 
-        # Constraints
-        constraints = [self.q[:, 0] == self.q0]  # initial condition
+        # Initial condition
+        constraints = [self.q[:, 0] == self.q0]
 
         # Input constraints
-        for k in range(self.N):
-            constraints += [
-                self.u[:, k] >= self.u_min,
-                self.u[:, k] <= self.u_max,
-            ]
+        if self.u_min is not None and self.u_max is not None:
+            for k in range(self.N):
+                constraints += [
+                    self.u[:, k] >= self.u_min,
+                    self.u[:, k] <= self.u_max,
+                ]
+
+        # Input rate constraints
+        if self.delta_u_min is not None and self.delta_u_max is not None:
+            for k in range(self.N - 1):
+                constraints += [
+                    self.u[:, k + 1] - self.u[:, k] <= self.delta_u_max,
+                    self.u[:, k + 1] - self.u[:, k] >= self.delta_u_min,
+                ]
 
         # State constraints
-        # --
+        if self.q_min is not None and self.q_max is not None:
+            raise NotImplementedError("State constraints are not implemented yet. ")
+            # TODO: implement state constraints
+
         # Dynamics
         for k in range(self.N):
             constraints += [
