@@ -18,6 +18,7 @@ class Mpc:
         self.dt: float = None
         self.N: int = None
         self.discretization_method: str = None
+        self.discretization_options: list[str] = ["euler", "zoh"]
 
         # Cost function matrices
         self.Q: np.ndarray = None
@@ -187,10 +188,54 @@ class Mpc:
         self.dt = dt
 
     def set_horizon(self, horizon: int):
-        pass
+        """
+        Set the prediction horizon for the MPC controller.
 
-    def set_discretization_method(self, method):
-        pass
+        Parameters:
+        - horizon (int): Prediction horizon for the MPC controller.
+
+        Raises:
+        - ValueError: If horizon is not a positive integer.
+        - TypeError: If horizon is not an int.
+        """
+        # Parse input
+        if not isinstance(horizon, int):
+            raise TypeError(f"horizon must be an int, got {type(horizon)}")
+        if horizon <= 0:
+            raise ValueError(f"horizon must be a positive integer, got {horizon}")
+
+        # Check if the problem is already initialized
+        self._warn_if_initialized()
+
+        # Set the prediction horizon
+        self.N = horizon
+
+    def set_discretization_method(self, method: str):
+        """
+        Set the discretization method for the MPC controller.
+
+        Parameters:
+        - method (str): Discretization method for the MPC controller. Must be part of
+        the `self.discretization_options` list. The list can be customized in the
+        subclasses to allow for specific discretization methods.
+
+        Raises:
+        - ValueError: If method is not in the `self.discretization_options` list.
+        - TypeError: If method is not a string.
+        """
+        # Parse input
+        if not isinstance(method, str):
+            raise TypeError(f"method must be a string, got {type(method)}")
+        if method not in self.discretization_options:
+            raise ValueError(
+                f"method must be one of {self.discretization_options}, got {method}"
+            )
+
+        # Check if the problem is already initialized
+        self._warn_if_initialized()
+
+        # Set the discretization method
+        self.discretization_method = method
 
     def set_weights(self, Q: np.ndarray, R: np.ndarray, P: np.ndarray):
         """
