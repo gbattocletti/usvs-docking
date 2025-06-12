@@ -48,8 +48,8 @@ class LinearMpc:
         # Input and state bounds (optional)
         self.u_min: np.ndarray = None
         self.u_max: np.ndarray = None
-        self.delta_u_max: np.ndarray = None
-        self.delta_u_min: np.ndarray = None
+        self.u_rate_min: np.ndarray = None
+        self.u_rate_max: np.ndarray = None
         self.q_min: np.ndarray = None
         self.q_max: np.ndarray = None
 
@@ -213,7 +213,7 @@ class LinearMpc:
         self.u_min = u_min
         self.u_max = u_max
 
-    def set_input_rate_bounds(self, delta_u_min: np.ndarray, delta_u_max: np.ndarray):
+    def set_input_rate_bounds(self, u_rate_min: np.ndarray, u_rate_max: np.ndarray):
         """
         Set the input rate bounds for the MPC. These bounds are used to limit the rate
         of change of the control inputs, and take into account the actuaor dynamics in
@@ -227,11 +227,11 @@ class LinearMpc:
             ValueError: If the input shapes are not as expected.
         """
         # Validate the inputs
-        if not delta_u_min.shape == (4,):
+        if not u_rate_min.shape == (4,):
             raise ValueError(
                 "Minimum input rate bounds delta_u_min must be of shape (4, )."
             )
-        if not delta_u_max.shape == (4,):
+        if not u_rate_max.shape == (4,):
             raise ValueError(
                 "Maximum input rate bounds delta_u_max must be of shape (4, )."
             )
@@ -240,8 +240,8 @@ class LinearMpc:
         self._warn_if_initialized()
 
         # Set the input rate bounds
-        self.delta_u_min = delta_u_min
-        self.delta_u_max = delta_u_max
+        self.u_rate_max = u_rate_min
+        self.u_rate_min = u_rate_max
 
     def set_state_bounds(self, q_min: np.ndarray, q_max: np.ndarray):
         """
@@ -355,7 +355,7 @@ class LinearMpc:
                 "Input bounds u_min and u_max are not set. Call set_input_bounds() "
                 "first."
             )
-        if self.delta_u_max is None or self.delta_u_min is None:
+        if self.u_rate_min is None or self.u_rate_max is None:
             raise ValueError(
                 "Input rate bounds delta_u_max and delta_u_min are not set. "
                 "Call set_input_bounds() first."
@@ -385,11 +385,11 @@ class LinearMpc:
                 ]
 
         # Input rate constraints
-        if self.delta_u_min is not None and self.delta_u_max is not None:
+        if self.u_rate_max is not None and self.u_rate_min is not None:
             for k in range(self.N - 1):
                 constraints += [
-                    self.u[:, k + 1] - self.u[:, k] <= self.delta_u_max,
-                    self.u[:, k + 1] - self.u[:, k] >= self.delta_u_min,
+                    self.u[:, k + 1] - self.u[:, k] <= self.u_rate_min,
+                    self.u[:, k + 1] - self.u[:, k] >= self.u_rate_max,
                 ]
 
         # State constraints

@@ -115,10 +115,10 @@ def save_sim_data(
         f.write(f"\t P matrix: np.diag([{np.diag(controller.P)}])\n")
         f.write(f"\t u_min: {controller.u_min}\n")
         f.write(f"\t u_max: {controller.u_max}\n")
-        if controller.delta_u_min is not None:
-            f.write(f"\t delta_u_min: {controller.delta_u_min}\n")
-        if controller.delta_u_max is not None:
-            f.write(f"\t delta_u_max: {controller.delta_u_max}\n")
+        if controller.u_rate_max is not None:
+            f.write(f"\t delta_u_min: {controller.u_rate_max}\n")
+        if controller.u_rate_min is not None:
+            f.write(f"\t delta_u_max: {controller.u_rate_min}\n")
         if controller.q_min is not None:
             f.write(f"\t q_min: {controller.q_min}\n")
         if controller.q_max is not None:
