@@ -20,10 +20,24 @@ class Mpc:
         self.discretization_method: str = None
         self.discretization_options: list[str] = ["euler", "zoh"]
 
-        # Cost function matrices
-        self.Q: np.ndarray = None
-        self.R: np.ndarray = None
-        self.P: np.ndarray = None
+        # Optimization problem
+        self.ocp: cp.Problem | ca.Opti
+        self.ocp_ready: bool = False  # Flag to check if the OCP is initialized
+        self.update_ocp_automatically: bool = False
+        self.solver_options: dict = {}
+        self.ocp_options: dict = {}
+
+        # Optimization variables
+        self.n_u: int = 4  # Number of control inputs
+        self.n_q: int = 6  # Number of states
+        self.u: cp.Variable | ca.Opti.variable  # Control input (n_u, N)
+        self.q: cp.Variable | ca.Opti.variable  # State trajectory (n_q, N+1)
+
+        # Optimization problem parameters
+        self.q_0: cp.Parameter | ca.Opti.parameter  # Initial state (n_q, )
+        self.q_ref: cp.Parameter | ca.Opti.parameter  # Reference sequence (n_q, N+1)
+        self.b_curr: cp.Parameter | ca.Opti.parameter  # Current disturbance (3, )
+        self.b_wind: cp.Parameter | ca.Opti.parameter  # Wind disturbance (3, )
 
         # Constraints
         self.u_min: np.ndarray = None
@@ -38,26 +52,10 @@ class Mpc:
         self.q_terminal_min: np.ndarray = None
         self.q_terminal_max: np.ndarray = None
 
-        # Disturbances (exogenous inputs)
-        self.b_curr: cp.Parameter | ca.Opti.parameter
-        self.b_wind: cp.Parameter | ca.Opti.parameter
-
-        # Optimization variables
-        self.n_u: int = 4  # Number of control inputs
-        self.n_q: int = 6  # Number of states
-        self.u: cp.Variable | ca.Opti.variable  # Control input (n_u, N)
-        self.q: cp.Variable | ca.Opti.variable  # State trajectory (n_q, N+1)
-
-        # Optimization problem parameters
-        self.q0: cp.Parameter | ca.Opti.parameter  # Initial state (n_q, )
-        self.q_ref: cp.Parameter | ca.Opti.parameter  # Reference sequence (n_q, N+1)
-
-        # Optimization problem
-        self.ocp: cp.Problem | ca.Opti
-        self.ocp_ready: bool = False  # Flag to check if the OCP is initialized
-        self.update_ocp_automatically: bool = True
-        self.solver_options: dict = {}
-        self.ocp_options: dict = {}
+        # Cost function matrices
+        self.Q: np.ndarray = None
+        self.R: np.ndarray = None
+        self.P: np.ndarray = None
 
         # Misc parameters
         self.verbose: bool = False
@@ -478,7 +476,13 @@ class Mpc:
         self.q_terminal_min = q_terminal_min
         self.q_terminal_max = q_terminal_max
 
-    def set_model(self, M_inv: np.ndarray, D_L: np.ndarray, T: np.ndarray, phi: float):
+    def set_model(
+        self,
+        M_inv: np.ndarray,
+        D_L: np.ndarray,
+        T: np.ndarray,
+        **kwargs: dict,
+    ):
         """
         Set the model matrices for the MPC controller.
 
@@ -486,7 +490,8 @@ class Mpc:
         - M_inv (np.ndarray): Inverse of the mass matrix (n_q, n_q).
         - D_L (np.ndarray): Linear damping matrix (n_q, n_q).
         - T (np.ndarray): Transformation matrix (n_q, n_q).
-        - phi (float): Heading angle of the vehicle in radians.
+        - **kwargs (dict): Additional keyword arguments for the specific MPC subclasses.
+            The kwargs are passed directly to the `_set_model` method of the subclass.
         """
         # Parse inputs
         if not isinstance(M_inv, np.ndarray):
@@ -501,9 +506,15 @@ class Mpc:
             raise ValueError(
                 f"D_L must be of shape ({self.n_q}, {self.n_q}), got {D_L.shape}"
             )
+        if not isinstance(T, np.ndarray):
+            raise TypeError(f"T must be a numpy array, got {type(T)}")
+        if T.shape != (self.n_q, self.n_q):
+            raise ValueError(
+                f"T must be of shape ({self.n_q}, {self.n_q}), got {T.shape}"
+            )
 
         # Call the class-specific method to set the model
-        self._set_model(M_inv, D_L, T, phi)
+        self._set_model(M_inv, D_L, T, **kwargs)
 
     @abstractmethod
     def _set_model(
@@ -511,7 +522,7 @@ class Mpc:
         M_inv: np.ndarray,
         D_L: np.ndarray,
         T: np.ndarray,
-        phi: float,
+        **kwargs: dict,
     ):
         """
         Internal method to set the model matrices for the MPC controller. This method
@@ -525,9 +536,6 @@ class Mpc:
         raise NotImplementedError(
             "The _set_model method must be implemented in subclasses."
         )
-
-    def update_model(self):
-        pass
 
     def init_ocp(self):
         """
@@ -579,9 +587,11 @@ class Mpc:
             agency. However, it influences the value of the cost by offsetting it by
             the initial state cost.
         - b_curr (np.ndarray, optional): Current force expressed in the body reference
-            frame (3, ). Deault is a zero vector.
+            frame (3, ). The force is assumed to be stationary over the horizon.
+            Deault is a zero vector.
         - b_wind (np.ndarray, optional): Wind force expressed in the body reference
-            frame (3, ). Default is a zero vector.
+            frame (3, ). The force is assumed to be stationary over the horizon.
+            Default is a zero vector.
 
         Raises:
         - ValueError: If q_0, q_ref, b_curr, or b_wind are not of the expected shapes.
@@ -590,7 +600,7 @@ class Mpc:
         - NotImplementedError: If the _solve method is not implemented in the subclass.
 
         Returns:
-        - u: Control input vector (n_u, N).
+        - u: Optimal control input sequence (n_u, N).
         - q_pred: Predicted state trajectory (n_q, N+1).
         - c: Computed cost of the MPC solution.
         """
@@ -647,10 +657,12 @@ class Mpc:
         Compute the cost of the MPC solution.
 
         Returns:
-        - c: Total cost.
-        - c_state: State cost.
-        - c_input: Input cost.
-        - c_terminal: Terminal cost.
+            tuple: A tuple containing the total cost, state cost, input cost, and
+            terminal cost.
+            - c_tot (float): The total cost of the MPC problem.
+            - c_state (float): The cost associated with the state trajectory.
+            - c_input (float): The cost associated with the control inputs.
+            - c_terminal (float): The terminal cost at the end of the horizon.
 
         Raises:
         - RuntimeError: If the OCP has not been initialized.
@@ -662,8 +674,8 @@ class Mpc:
                 "The OCP has not been initialized. Call init_ocp() first."
             )
 
-        c, c_state, c_terminal, c_input = self._cost()
-        return c, c_state, c_terminal, c_input
+        c_tot, c_state, c_terminal, c_input = self._cost()
+        return c_tot, c_state, c_terminal, c_input
 
     @abstractmethod
     def _cost(self):
