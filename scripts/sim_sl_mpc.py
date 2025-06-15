@@ -198,11 +198,11 @@ for i in range(sim_n):
 print(f"\nSimulation completed. [{datetime.datetime.now().strftime('%H:%M:%S')}]")
 
 # Generate filename to save data
-filename = io.generate_filename()
+sim_name, _ = io.generate_filename()
 
 # Save simulation data
 io.save_sim_data(
-    filename,
+    sim_name,
     plant,
     mpc,
     dist,
@@ -213,8 +213,11 @@ io.save_sim_data(
     u_mat,
     w_q_mat,
     w_u_mat,
+    v_curr,
+    v_wind,
     b_curr,
     b_wind,
+    cost_mat,
 )
 
 # Generate and save plots
@@ -226,12 +229,9 @@ if SAVE_PLOTS is True or SHOW_PLOTS is True:
     )
     fig_phase, _ = plot_functions.phase_plot(q_mat[:, :-1], v_curr, v_wind)
 
-if SHOW_PLOTS is True:
-    plt.show(block=False)
-
 if SAVE_PLOTS is True:
-    io.save_figure(fig_variables, filename, "variables")
-    io.save_figure(fig_phase, filename, "phase-plot")
+    io.save_figure(fig_variables, sim_name, "variables")
+    io.save_figure(fig_phase, sim_name, "phase-plot")
 
 # Generate and save animation
 if SAVE_ANIM is True:
@@ -239,4 +239,7 @@ if SAVE_ANIM is True:
     anim = plot_functions.generate_animation(
         t_vec, q_mat[:, :-1], q_ref_mat, u_mat, v_curr, v_wind, speed_up_factor
     )
-    io.save_animation(anim, filename)
+    io.save_animation(anim, sim_name)
+
+if SHOW_PLOTS is True:
+    plt.show()

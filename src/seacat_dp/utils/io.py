@@ -16,13 +16,18 @@ from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
 from seacat_dp.model import disturbances, nonlinear_model
 
 
-def generate_filename() -> str:
+def generate_filename() -> tuple[str, str]:
     """
-    Generate a unique filename for the simulation results.
+    Generate a unique filename for the simulation results. The filename points to a
+    directory in the results folder, named with the current date and a counter to ensure
+    uniqueness. Files will be saved in this directory and their name will start with
+    the same date and counter, followed (possibly) by a suffix, and by the file type.
 
     Returns:
         str: A string representing the unique simulation name based on the current date
         and a counter.
+        str: A string representing the relative path to the directory where the
+        simulation data will be saved, including the simulation name.
     """
     # Create the results directory if it doesn't exist
     if not os.path.exists("results"):
@@ -31,17 +36,21 @@ def generate_filename() -> str:
     # Generate unique simulation name
     date = datetime.now().strftime("%Y-%m-%d")
     counter = 0
-    while os.path.exists(f"results\\{date}-{counter:04}.pkl"):
+    while os.path.isdir(f"results\\{date}-{counter:04}"):
         counter += 1
     sim_id = f"{counter:04}"
     sim_name = f"{date}-{sim_id}"
+    os.makedirs(f"results\\{sim_name}")
+
+    # Create root file name in the results folder
+    path_name = f"results\\{sim_name}\\{sim_name}"
 
     # Return simulation name
-    return sim_name
+    return sim_name, path_name
 
 
 def save_sim_data(
-    filename: str,
+    sim_name: str,
     model: nonlinear_model.NonlinearModel,
     controller: linear_mpc.LinearMpc | mpc.Mpc | nonlinear_mpc.NonlinearMpc,
     dist: disturbances.Disturbances,
@@ -52,14 +61,17 @@ def save_sim_data(
     u_mat: np.ndarray,
     w_q_mat: np.ndarray,
     w_u_mat: np.ndarray,
+    v_current: np.ndarray,
+    v_wind: np.ndarray,
     b_current: np.ndarray,
     b_wind: np.ndarray,
+    cost_mat: np.ndarray,
 ) -> None:
     """
     Run all the save functions that must be executed for every simulation
 
     Args:
-        filename (str): Name of the simulation (unique identifier) to use to generate
+        sim_name (str): Name of the simulation (unique identifier) to use to generate
             the filename to save the simulation data.
         model (nonlinear_model.NonlinearModel): plant model object.
         controller (linear_mpc.LinearMPC or mpc.MPC or nonlinear_mpc.NonlinearMPC):
@@ -72,26 +84,31 @@ def save_sim_data(
         u_mat (np.ndarray): control input (u). (4, N)
         w_q_mat (np.ndarray): measurement noise (w). (6, N)
         w_u_mat (np.ndarray): actuation noise (w_u). (4, N)
+        v_current (np.ndarray): current velocity. Assumed stationary. (3, )
+        v_wind (np.ndarray): wind velocity. Assumed stationary. (3, )
         b_current (np.ndarray): current exogenous input. Assumed stationary. (3, )
         b_wind (np.ndarray): wind exogenous input. Assumed stationary. (3, )
+        cost_mat (np.ndarray): cost matrix. (N, )
 
     Returns:
         None
     """
-    # Parse filename
-    if not filename.startswith("results\\"):
-        filename = f"results\\{filename}"
-    if filename.endswith(".pkl"):
-        filename = filename.replace(".pkl", "")
-    if filename.endswith(".md"):
-        filename = filename.replace(".md", "")
-    if filename.endswith(".txt"):
-        filename = filename.replace(".txt", "")
+    # Parse filename (kind of redundant, but ensures consistency)
+    if sim_name.startswith("results\\"):
+        raise ValueError(
+            "Filename should not start with 'results\\'. Only the simulation id should "
+            "be provided, i.e., a string formatted as 'YYYY-MM-DD-XXXX'."
+        )
+    if sim_name.endswith(".pkl"):
+        sim_name = sim_name.replace(".pkl", "")
+    if sim_name.endswith(".md"):
+        sim_name = sim_name.replace(".md", "")
+    if sim_name.endswith(".txt"):
+        sim_name = sim_name.replace(".txt", "")
 
     # Create filenames for different formats
-    txt_filename = f"{filename}.txt"
-    pkl_filename = f"{filename}.pkl"
-    sim_name = filename.split("\\")[-1]
+    txt_filename = f"results\\{sim_name}\\{sim_name}.txt"
+    pkl_filename = f"results\\{sim_name}\\{sim_name}.pkl"
 
     # Write README file
     with open(txt_filename, "w") as f:
@@ -141,8 +158,11 @@ def save_sim_data(
         "w_q_mat": w_q_mat,
         "u_control_mat": u_mat,
         "w_u_mat": w_u_mat,
+        "v_current": v_current,
+        "v_wind": v_wind,
         "b_current": b_current,
         "b_wind": b_wind,
+        "cost_mat": cost_mat,
     }
 
     # Write data to pickle file
@@ -154,24 +174,33 @@ def save_sim_data(
     print("Simulation data saved.")
 
 
-def load_sim_data(filename: str) -> dict:
+def load_sim_data(sim_name: str) -> dict:
     """
     Load simulation data from a pickle file.
 
     Args:
-        filename (str): Name of the file to load.
+        sim_name (str): Name of the simulation to load. The filename should be the
+            unique identifier of the simulation, which is the same as the one used to
+            save the simulation data, having format 'YYYY-MM-DD-XXXX'.
 
     Raises:
+        ValueError: If the filename starts with 'results\\'.
         FileNotFoundError: If the specified file does not exist.
 
     Returns:
         data (dict): A dictionary containing the loaded simulation data.
     """
+    # Parse filename
+    if sim_name.startswith("results\\"):
+        raise ValueError(
+            "Filename should not start with 'results\\'. Only the simulation id should "
+            "be provided, i.e., a string formatted as 'YYYY-MM-DD-XXXX'."
+        )
+    if sim_name.endswith(".pkl"):
+        sim_name = sim_name.replace(".pkl", "")
 
     # Create complete filename
-    if not filename.endswith(".pkl"):
-        filename = f"{filename}.pkl"  # Add .pkl extension if not present
-    filename = f"results\\{filename}"  # Add results folder path to filename
+    filename = f"results\\{sim_name}\\{sim_name}.pkl"  # Create filename
 
     # Load data
     if os.path.isfile(filename):
@@ -191,32 +220,33 @@ def select_file_interactively() -> str:
     """
     root = tk.Tk()
     root.withdraw()  # Hide the main window
-    file_path = filedialog.askopenfilename(
+    filename = filedialog.askopenfilename(
         initialdir="results",
         title="Select .pkl file to visualize",
         filetypes=[("Pickle files", "*.pkl"), ("All files", "*.*")],
     )
     root.destroy()
-    return os.path.basename(file_path)
+
+    # extract filename without path and extension
+    filename = os.path.splitext(os.path.basename(filename))[0]
+    return os.path.basename(filename)
 
 
-def save_figure(fig: plt.Figure, filename: str, name: str) -> None:
+def save_figure(fig: plt.Figure, sim_name: str, name: str) -> None:
     """
     Save a matplotlib figure to a file.
 
     Args:
         fig (plt.Figure): plt.Figure object to save.
-        filename (str): Filename to save the figure to.
-        name (str): Name of the figure, to add to the filename.
+        sim_name (str): Sim name of the simulation being plotted.
+        name (str): Name of the figure, to add to the sim name.
     """
-    # Parse filename
-    if not filename.startswith("results\\"):
-        filename = f"results\\{filename}"
-    if not filename.endswith(".png"):
-        filename = f"{filename}.png"
+    # Parse sim name
+    if sim_name.endswith(".png"):
+        sim_name = sim_name.replace(".png", "")
 
-    # Add name to filename
-    filename = filename.replace(".png", f"-{name}.png")
+    # Create filename
+    filename = f"results\\{sim_name}\\{sim_name}-{name}.png"
 
     # Save figure
     print(f"Saving figure {name}...")
@@ -224,19 +254,20 @@ def save_figure(fig: plt.Figure, filename: str, name: str) -> None:
     print("Figure saving completed.")
 
 
-def save_animation(anim: FuncAnimation, filename: str) -> None:
+def save_animation(anim: FuncAnimation, sim_name: str) -> None:
     """
     Save the animation to a file.
 
     Args:
         anim (FuncAnimation): The animation object to save.
-        filename (str): The name of the file to save the animation to.
+        sim_name (str): The name of the file to save the animation to.
     """
-    # Parse filename
-    if not filename.startswith("results\\"):
-        filename = f"results\\{filename}"
-    if not filename.endswith(".gif"):
-        filename += ".gif"
+    # Parse sim name
+    if sim_name.endswith(".gif"):
+        sim_name.replace(".gif", "")
+
+    # Create filename
+    filename = f"results\\{sim_name}\\{sim_name}-animation.gif"
 
     # Save animation
     total_frames = anim._save_count  # pylint: disable=protected-access
