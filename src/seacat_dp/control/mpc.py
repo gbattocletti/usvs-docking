@@ -226,7 +226,9 @@ class Mpc:
             raise TypeError(f"method must be a string, got {type(method)}")
         if method not in self.discretization_options:
             raise ValueError(
-                f"method must be one of {self.discretization_options}, got {method}"
+                f"Discretization method {method} is not supported by this class. "
+                "Please use one of the following methods: "
+                f"{self.discretization_options}."
             )
 
         # Check if the problem is already initialized
@@ -487,31 +489,28 @@ class Mpc:
         Set the model matrices for the MPC controller.
 
         Parameters:
-        - M_inv (np.ndarray): Inverse of the mass matrix (n_q, n_q).
-        - D_L (np.ndarray): Linear damping matrix (n_q, n_q).
-        - T (np.ndarray): Transformation matrix (n_q, n_q).
+        - M_inv (np.ndarray): Inverse of the mass matrix (n_q/2, n_q/2).
+        - D_L (np.ndarray): Linear damping matrix (n_q/2, n_q/2).
+        - T (np.ndarray): Transformation matrix (n_q/2, n_u).
         - **kwargs (dict): Additional keyword arguments for the specific MPC subclasses.
             The kwargs are passed directly to the `_set_model` method of the subclass.
         """
         # Parse inputs
+        n_v = int(self.n_q / 2)  # Number of velocity states (n_q//2)
         if not isinstance(M_inv, np.ndarray):
             raise TypeError(f"M_inv must be a numpy array, got {type(M_inv)}")
-        if M_inv.shape != (self.n_q, self.n_q):
+        if M_inv.shape != (n_v, n_v):
             raise ValueError(
-                f"M_inv must be of shape ({self.n_q}, {self.n_q}), got {M_inv.shape}"
+                f"M_inv must be of shape ({n_v}, {n_v}), " f"got {M_inv.shape}"
             )
         if not isinstance(D_L, np.ndarray):
             raise TypeError(f"D_L must be a numpy array, got {type(D_L)}")
-        if D_L.shape != (self.n_q, self.n_q):
-            raise ValueError(
-                f"D_L must be of shape ({self.n_q}, {self.n_q}), got {D_L.shape}"
-            )
+        if D_L.shape != (n_v, n_v):
+            raise ValueError(f"D_L must be of shape ({n_v}, {n_v}), got {D_L.shape}")
         if not isinstance(T, np.ndarray):
             raise TypeError(f"T must be a numpy array, got {type(T)}")
-        if T.shape != (self.n_q, self.n_q):
-            raise ValueError(
-                f"T must be of shape ({self.n_q}, {self.n_q}), got {T.shape}"
-            )
+        if T.shape != (n_v, self.n_u):
+            raise ValueError(f"T must be of shape ({n_v}, {self.n_u}), got {T.shape}")
 
         # Call the class-specific method to set the model
         self._set_model(M_inv, D_L, T, **kwargs)

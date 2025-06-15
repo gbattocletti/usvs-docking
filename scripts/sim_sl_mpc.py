@@ -14,12 +14,15 @@ from seacat_dp.visualization import plot_functions
 # Simulations settings
 VERBOSE = False
 SAVE_PLOTS = True
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 SAVE_ANIM = True
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent
 os.chdir(script_dir)
+
+# Seed
+np.random.seed(1)  # for reproducibility
 
 # Simulation parameters
 sim_t = 0.0  # simulation time [s]
@@ -28,9 +31,9 @@ sim_dt = 0.001  # simulation time step [s]
 sim_n = int(sim_t_end / sim_dt)  # number of time steps []
 t_vec = sim_dt * np.arange(sim_n)  # time vector [s]
 ctrl_t = 0.0  # time from the last control input [s] (used to trigger control).
-ctrl_dt = 0.5  # control time step [s]
+ctrl_dt = 0.25  # control time step [s]
 ctrl_n = int(ctrl_dt / sim_dt)  # time steps per control step
-ctrl_N = 40  # prediction horizon
+ctrl_N = 20  # prediction horizon
 
 # Initialize model
 params = parameters.Parameters()
@@ -55,7 +58,7 @@ mpc = linear_mpc.LinearMpc()
 mpc.set_dt(ctrl_dt)
 mpc.set_horizon(ctrl_N)
 mpc.set_discretization_method("zoh")
-mpc.set_model(plant.M_inv, plant.D_L, plant.T, plant.q[2])
+mpc.set_model(plant.M_inv, plant.D_L, plant.T, phi=plant.q[2])
 Q = scipy.linalg.block_diag(10e3 * np.eye(2), 10e0, np.eye(2), 0.01)  # pos, vel
 R = scipy.linalg.block_diag(10e-3 * np.eye(2), 10e-1 * np.eye(2))  # stern, bow
 P = Q
@@ -100,7 +103,7 @@ mpc.init_ocp()
 q_ref = np.zeros(6)  # state reference
 q_ref[0] = 6.0  # [m]
 q_ref[1] = 2.0  # [m]
-q_ref[2] = 0.0  # [rad]
+q_ref[2] = -np.pi / 6  # [rad]
 w_q = np.zeros(6)  # measurement noise
 w_u = np.zeros(4)  # actuation noise
 q_meas = np.zeros(6)  # measured state
@@ -126,12 +129,6 @@ cost_mat = np.zeros(sim_n)
 # Run the simulation
 print(f"\nSimulation started... [{datetime.datetime.now().strftime('%H:%M:%S')}]")
 for i in range(sim_n):
-
-    # Change reference at predefined intervals
-    # t = t_vec[i]
-    # if 40 <= t < 80.0:
-    #     q_ref[0] = 0.0
-    #     q_ref[1] = 0.0
 
     # update control input
     if ctrl_t == 0.0 or ctrl_t >= ctrl_dt:
