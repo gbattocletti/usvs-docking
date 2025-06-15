@@ -23,49 +23,41 @@ class NonlinearMpc(Mpc):
         self.ocp = ca.Opti()
         self.sol = None  # Solution to the OCP problem. To access stats sol.stats()
 
-        # Initialize the solver options
+        # Solver options
+        # Ipopt options: https://coin-or.github.io/Ipopt/OPTIONS.html
         self.solver_options: dict = {
-            "max_iter": 1000,  # Maximum iterations
-            "ipopt.max_iter": 1000,
+            "max_iter": 10_000,
+            "max_wall_time": 1.0,  # Max solver time [s]
+            "max_cpu_time": 1.0,  # Max CPU time [s]
             "print_level": 0,  # 0-5 (0 = silent, 5 = verbose)
-            "print_time": 0,
             "tol": 1e-6,  # Optimality tolerance
             "acceptable_tol": 1e-4,  # Acceptable tolerance for early termination
             "linear_solver": "mumps",  # Recommended for most problems
         }
+
+        # Ocp options
         self.ocp_options: dict = {
-            "expand": True,  # Faster runtime
-            "error_on_fail": True,  # Raise exception if fails
-            # "print_time": 0,  # Suppress compiler output
+            "expand": True,
+            "error_on_fail": False,
+            "print_time": 0,  # Suppress compiler output
+            "verbose": False,
         }
 
         # Initialize OCP variables
-        self.q: ca.Opti.variable = self.ocp.variable(self.n_q, self.N + 1)  # (n_q, N+1)
-        self.u: ca.Opti.variable = self.ocp.variable(self.n_u, self.N)  # (n_u, N)
-        self.cost_function: ca.Opti.variable = self.ocp.variable(1, 1)  # Cost function
+        self.q: ca.Opti.variable  # (n_q, N+1)
+        self.u: ca.Opti.variable  # (n_u, N)
+        self.cost_function: ca.Opti.variable  # Cost function
 
         # Initialize OCP parameters
-        self.q_0 = self.ocp.parameter(self.n_q, 1)  # Initial state (n_q, 1)
-        self.q_ref = self.ocp.parameter(self.n_q, self.N + 1)  # Reference (n_q, N+1)
-        self.b_curr = self.ocp.parameter(self.n_q / 2, 1)
-        self.b_wind = self.ocp.parameter(self.n_q / 2, 1)
+        self.q_0: ca.Opti.parameter  # Initial state (n_q, 1)
+        self.q_ref: ca.Opti.parameter  # Reference (n_q, N+1)
+        self.b_curr: ca.Opti.parameter  # Disturbances (n_q/2, 1) in body frame
+        self.b_wind: ca.Opti.parameter  # Disturbances (n_q/2, 1) in body frame
 
         # Check model discretization method
         self.discretization_options = ["euler", "rk4"]  # class-specific options
-        if self.discretization_method == "zoh":
-            raise NotImplementedError(
-                "Zero-order hold (ZOH) discretization is not available in the "
-                "nonlinear MPC class. Pleas use one of the following methods: "
-                f"{self.discretization_options}."
-            )
-        elif self.discretization_method not in self.discretization_options:
-            raise ValueError(
-                f"Discretization method {self.discretization_method} is not supported "
-                "by the nonlinear MPC class. Please use one of the following methods: "
-                f"{self.discretization_options}."
-            )
 
-        # Model and model parameters
+        # Class-specific model parameters and constants
         self.M_inv: np.ndarray = None
         self.D_L: np.ndarray = None
         self.T: np.ndarray = None
@@ -143,28 +135,24 @@ class NonlinearMpc(Mpc):
         Args:
             q (ca.SX or ca.MX): State vector (n_q, ).
             u (ca.SX or ca.MX): Control input vector (n_u, ).
-            b (ca.SX or ca.MX): Lumped exogenous input vector (n_q, ) in body frame.
-
+            b_curr (ca.SX or ca.MX): Current exogenous input (n_q, ) in body frame.
+            b_wind (ca.SX or ca.MX): Wind exogenous input (n_q, ) in body frame.
         Returns:
             dq (ca.SX or ca.MX): Time derivative of the state vector (n_q, ).
         """
 
-        # NOTE: some of the indexes are currently hardcoded, as the model is assumed to
-        # have 6 states (3 position, 3 velocity) and 4 controls (2 stern, 2 bow).
-
-        v = q[3:6]  # Extract velocity (vx, vy, vz)
+        # NOTE: the indexes are currently hardcoded, as the model is assumed to have
+        # 6 states (3 position, 3 velocity) and 4 controls (2 stern, 2 bow).
 
         # Build rotation matrix from the yaw angle (q[2])
-        R = ca.MX(
-            [
-                [ca.cos(q[2]), -ca.sin(q[2]), 0],
-                [ca.sin(q[2]), ca.cos(q[2]), 0],
-                [0, 0, 1],
-            ]
+        R = ca.vertcat(
+            ca.horzcat(ca.cos(q[2]), -ca.sin(q[2]), 0.0),
+            ca.horzcat(ca.sin(q[2]), ca.cos(q[2]), 0.0),
+            ca.horzcat(0.0, 0.0, 1.0),
         )
 
         if self.D_NL is not None:
-            D = self.D_L + self.D_NL @ ca.fabs(v)
+            D = self.D_L + self.D_NL @ ca.fabs(q[3:6])
         else:
             D = self.D_L
 
@@ -173,14 +161,10 @@ class NonlinearMpc(Mpc):
                 "Coriolis matrix (C) is not implemented in the nonlinear MPC class. "
                 "Please remove it from the model parameters."
             )
-        else:
-            # NOTE: this matrix may do weird things if the number of states is odd. At
-            # the moment it is not worth updating it as the number of states is even.
-            C = np.zeros((self.n_q / 2, self.n_q / 2))
 
         # Nonlinear dynamics
-        dx = R @ v
-        dv = self.M_inv @ (-D @ v - C @ v + self.T @ u + b_curr + b_wind)
+        dx = R @ q[3:6]
+        dv = self.M_inv @ (-D @ q[3:6] + self.T @ u + b_curr + b_wind)
 
         return ca.vertcat(dx, dv)
 
@@ -189,6 +173,18 @@ class NonlinearMpc(Mpc):
         Initialize the OCP problem for the nonlinear MPC controller using the casadi
         optimization framework.
         """
+        # Initialize the OCP variables
+        self.q = self.ocp.variable(self.n_q, self.N + 1)
+        self.u = self.ocp.variable(self.n_u, self.N)
+
+        # Initialize the OCP parameters
+        self.q_0 = self.ocp.parameter(self.n_q, 1)  # Initial state (n_q, 1)
+        self.q_ref = self.ocp.parameter(self.n_q, self.N + 1)  # Reference (n_q, N+1)
+        self.b_curr = self.ocp.parameter(self.n_q // 2, 1)
+        self.b_wind = self.ocp.parameter(self.n_q // 2, 1)
+
+        # Cost function
+        self.cost_function = 0
 
         ## Constraints
         # Dynamics
@@ -239,8 +235,8 @@ class NonlinearMpc(Mpc):
             for k in range(self.N):
                 self.ocp.subject_to(
                     self.ocp.bounded(
-                        self.u[:, k],
                         self.u_min,
+                        self.u[:, k],
                         self.u_max,
                     )
                 )
@@ -250,8 +246,8 @@ class NonlinearMpc(Mpc):
             for k in range(1, self.N):
                 self.ocp.subject_to(
                     self.ocp.bounded(
-                        self.u[:, k:] - self.u[:, k - 1],
                         self.u_rate_min,
+                        self.u[:, k:] - self.u[:, k - 1],
                         self.u_rate_max,
                     )
                 )
@@ -278,8 +274,8 @@ class NonlinearMpc(Mpc):
             for k in range(self.N + 1):
                 self.ocp.subject_to(
                     self.ocp.bounded(
-                        self.q[:, k],
                         self.q_min,
+                        self.q[:, k],
                         self.q_max,
                     )
                 )
@@ -289,8 +285,8 @@ class NonlinearMpc(Mpc):
             for k in range(1, self.N + 1):
                 self.ocp.subject_to(
                     self.ocp.bounded(
-                        self.q[:, k] - self.q[:, k - 1],
                         self.q_rate_min,
+                        self.q[:, k] - self.q[:, k - 1],
                         self.q_rate_max,
                     )
                 )
@@ -299,8 +295,8 @@ class NonlinearMpc(Mpc):
         if self.q_terminal_min is not None and self.q_terminal_max is not None:
             self.ocp.subject_to(
                 self.ocp.bounded(
-                    self.q[:, -1],
                     self.q_terminal_min,
+                    self.q[:, -1],
                     self.q_terminal_max,
                 )
             )
@@ -308,25 +304,21 @@ class NonlinearMpc(Mpc):
         ## Cost function
         # State cost
         for k in range(self.N):
-            self.cost_function += ca.mtimes(
-                (self.q[:, k] - self.q_ref[:, k]).T,
-                self.Q,
-                (self.q[:, k] - self.q_ref[:, k]),
+            self.cost_function += (
+                (self.q[:, k] - self.q_ref[:, k]).T
+                @ self.Q
+                @ (self.q[:, k] - self.q_ref[:, k])
             )
 
         # Input cost
         for k in range(self.N):
-            self.cost_function += ca.mtimes(
-                self.u[:, k].T,
-                self.R,
-                self.u[:, k],
-            )
+            self.cost_function += self.u[:, k].T @ self.R @ self.u[:, k]
 
         # Terminal cost
-        self.cost_function += ca.mtimes(
-            (self.q[:, -1] - self.q_ref[:, -1]).T,
-            self.P,
-            (self.q[:, -1] - self.q_ref[:, -1]),
+        self.cost_function += (
+            (self.q[:, -1] - self.q_ref[:, -1]).T
+            @ self.P
+            @ (self.q[:, -1] - self.q_ref[:, -1])
         )
 
         # Define the objective and set the solver options
@@ -350,8 +342,8 @@ class NonlinearMpc(Mpc):
         self.ocp.set_value(self.q_ref, q_ref)
 
         # Set the disturbances
-        self.ocp.set_value(self.b_curr, np.hstack([np.zeros(3), b_curr]))  # (6, )
-        self.ocp.set_value(self.b_wind, np.hstack([np.zeros(3), b_wind]))  # (6, )
+        self.ocp.set_value(self.b_curr, b_curr)  # (3, )
+        self.ocp.set_value(self.b_wind, b_wind)  # (3, )
 
         # Solve the OCP problem
         self.sol = self.ocp.solve()
