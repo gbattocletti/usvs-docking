@@ -13,7 +13,8 @@ from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 
 from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
-from seacat_dp.model import disturbances, nonlinear_model
+from seacat_dp.model import disturbances, nonlinear_model, parameters
+from seacat_dp.utils import settings
 
 
 def generate_filename() -> tuple[str, str]:
@@ -51,6 +52,8 @@ def generate_filename() -> tuple[str, str]:
 
 def save_sim_data(
     sim_name: str,
+    params: parameters.Parameters,
+    sim_settings: settings.SimSettings,
     model: nonlinear_model.NonlinearModel,
     controller: linear_mpc.LinearMpc | mpc.Mpc | nonlinear_mpc.NonlinearMpc,
     dist: disturbances.Disturbances,
@@ -73,6 +76,8 @@ def save_sim_data(
     Args:
         sim_name (str): Name of the simulation (unique identifier) to use to generate
             the filename to save the simulation data.
+        params (parameters.Parameters): parameters object.
+        sim_settings (sim_settings.SimSettings): simulation settings object.
         model (nonlinear_model.NonlinearModel): plant model object.
         controller (linear_mpc.LinearMPC or mpc.MPC or nonlinear_mpc.NonlinearMPC):
             controller object.
@@ -151,6 +156,9 @@ def save_sim_data(
 
     # Collect the timeseries data in a dictionary to be saved in a pickle file
     data = {
+        "sim_name": sim_name,
+        "params": params,
+        "sim_settings": sim_settings,
         "t_vec": t_vec,
         "q_ref_mat": q_ref_mat,
         "q_mat": q_mat,
