@@ -27,8 +27,8 @@ class NonlinearMpc(Mpc):
         # Ipopt options: https://coin-or.github.io/Ipopt/OPTIONS.html
         self.solver_options: dict = {
             "max_iter": 10_000,
-            "max_wall_time": 1.0,  # Max solver time [s]
-            "max_cpu_time": 1.0,  # Max CPU time [s]
+            "max_wall_time": 10.0,  # Max solver time [s]
+            "max_cpu_time": 10.0,  # Max CPU time [s]
             "print_level": 0,  # 0-5 (0 = silent, 5 = verbose)
             "tol": 1e-6,  # Optimality tolerance
             "acceptable_tol": 1e-4,  # Acceptable tolerance for early termination
