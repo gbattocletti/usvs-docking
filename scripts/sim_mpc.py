@@ -13,6 +13,8 @@ from seacat_dp.visualization import plot_functions
 
 # Load simulation settings
 sim_settings = settings.SimSettings()
+sim_settings.controller = "nonlinear_mpc"
+# sim_settings.controller = "linear_mpc"
 
 # CHANGE SETTINGS HERE
 sim_settings.q_ref = np.array(
@@ -78,8 +80,10 @@ b_wind = plant.wind_load(v_wind)  # (3, ) wind force in body frame
 # Initialize MPC controller
 if controller == "linear_mpc":
     mpc = linear_mpc.LinearMpc()
+    mpc.set_model(plant.M_inv, plant.D_L, plant.T, phi=plant.q[2])
 elif controller == "nonlinear_mpc":
     mpc = nonlinear_mpc.NonlinearMpc()
+    mpc.set_model(plant.M_inv, plant.D_L, plant.T)
 elif controller == "pid":
     raise NotImplementedError("PID controller is not implemented in this script.")
 else:
@@ -88,13 +92,8 @@ else:
 mpc.set_dt(ctrl_dt)
 mpc.set_horizon(ctrl_N)
 mpc.set_discretization_method(sim_settings.discretization)
-mpc.set_model(plant.M_inv, plant.D_L, plant.T)
-Q = sim_settings.Q
-R = sim_settings.R
-P = sim_settings.P
-mpc.set_weights(Q, R, P)
+mpc.set_weights(sim_settings.Q, sim_settings.R, sim_settings.P)
 mpc.set_input_bounds(sim_settings.u_min, sim_settings.u_max)
-
 mpc.set_input_rate_bounds(sim_settings.delta_u_min / 5, sim_settings.delta_u_max / 5)
 mpc.init_ocp()
 
@@ -122,7 +121,8 @@ w_u_mat = np.zeros((4, sim_n))
 cost_mat = np.zeros(sim_n)
 
 # Run the simulation
-print(f"\nSimulation started... [{datetime.datetime.now().strftime('%H:%M:%S')}]")
+initial_time = datetime.datetime.now()
+print(f"\nSimulation started... [{initial_time.strftime('%H:%M:%S')}]")
 for i in range(sim_n):
 
     # update control input
@@ -164,8 +164,10 @@ for i in range(sim_n):
 
         if controller == "linear_mpc":
             mpc.update_model(q_meas[2])  # linearize the model around current heading
+
         u_vec, q_pred, cost = mpc.solve(q_meas, q_ref, b_curr, b_wind)  # solve mpc
 
+        # actuation noise and clipping
         u = u_vec[:, 0]  # extract the first control input from the solution
         w_u = dist.actuation_noise()  # generate actuation noise
         u = u + w_u  # add actuation noise
@@ -193,7 +195,10 @@ for i in range(sim_n):
             f"Simulation progress: {i+1}/{sim_n} [{(i+1) / sim_n * 100:.4f}%]", end="\r"
         )
 
-print(f"\nSimulation completed. [{datetime.datetime.now().strftime('%H:%M:%S')}]")
+final_time = datetime.datetime.now()
+elapsed_time = final_time - initial_time
+print(f"\nSimulation completed. [{final_time.strftime('%H:%M:%S')}]")
+print(f"Elapsed time: {str(elapsed_time)}")
 
 # Generate filename to save data
 sim_name, _ = io.generate_filename()
@@ -232,10 +237,12 @@ if sim_settings.save_plots is True or sim_settings.show_plots is True:
         q_ref_mat,
         cost_mat,
     )
+    idx_list = list(np.linspace(0, sim_n, num=int(sim_n / 10000) + 1, dtype=int))
     fig_phase, _ = plot_functions.phase_plot(
         q_mat[:, :-1],
         v_curr,
         v_wind,
+        idx=idx_list,
     )
 
 if sim_settings.save_plots is True:
