@@ -195,9 +195,12 @@ def phase_plot(
     # Plot body reference frames
     for i in idx:
         if i >= q_mat.shape[1]:
-            raise ValueError(
-                f"Index {i} is out of bounds for q_mat with shape {q_mat.shape}."
-            )
+            if i == q_mat.shape[1]:
+                i = -1  # Fix small indexing errors
+            else:
+                raise ValueError(
+                    f"Index {i} is out of bounds for q_mat with shape {q_mat.shape}."
+                )
         psi = q_mat[2, i]
         robot = q_mat[0:2, i]
         robot = np.array([robot[1], robot[0]])
