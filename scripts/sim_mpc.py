@@ -28,21 +28,39 @@ sim_settings.q_ref = np.array(
     ]
 )
 
-# Print some info to the console
-print(
-    f"Simulation settings:\n"
-    f"\tController: {sim_settings.controller} "
-    f"(ctrl_dt: {sim_settings.ctrl_dt:.4f}, "
-    f"ctrl_N: {sim_settings.ctrl_N})\n"
-    f"\tInitial state: {sim_settings.q_0}\n"
-    f"\tReference state: {sim_settings.q_ref}\n"
-)
 
 ########################################################################################
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent
 os.chdir(script_dir)
+
+# Preprocess info for printing
+q_0_str = "["
+for i, q in enumerate(sim_settings.q_0):
+    if i == len(sim_settings.q_0) - 1:
+        q_0_str += f"{q:.2f}"
+    else:
+        q_0_str += f"{q:.2f}, "
+q_0_str += "]"
+
+q_ref_str = "["
+for i, q in enumerate(sim_settings.q_ref):
+    if i == len(sim_settings.q_ref) - 1:
+        q_ref_str += f"{q:.2f}"
+    else:
+        q_ref_str += f"{q:.2f}, "
+q_ref_str += "]"
+
+# Print some info to the console
+print(
+    f"Simulation settings:\n"
+    f"\tController: {sim_settings.controller} "
+    f"(ctrl_dt: {sim_settings.ctrl_dt:.4f}, "
+    f"ctrl_N: {sim_settings.ctrl_N})\n"
+    f"\tInitial state: {q_0_str}\n"
+    f"\tReference state: {q_ref_str}\n"
+)
 
 # Seed
 np.random.seed(sim_settings.seed)  # for reproducibility
