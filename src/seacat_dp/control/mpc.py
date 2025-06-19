@@ -674,6 +674,16 @@ class Mpc:
             )
 
         c_tot, c_state, c_terminal, c_input = self._cost()
+
+        if c_tot != c_state + c_input + c_terminal:
+            warnings.warn(
+                "Warning: Total cost does not match the sum of individual costs. "
+                f"Total cost: {c_tot}. State cost: {c_state}, "
+                f"Input cost: {c_input}, Terminal cost: {c_terminal}"
+                f"(sum: {c_state + c_input + c_terminal}).",
+                UserWarning,
+            )
+
         return c_tot, c_state, c_terminal, c_input
 
     @abstractmethod

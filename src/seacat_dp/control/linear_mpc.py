@@ -284,36 +284,24 @@ class LinearMpc(Mpc):
             RuntimeError: If the MPC optimization problem is not initialized.
 
         Returns:
-            cost (float): The total cost of the MPC solution.
-            cost_state (float): The state cost.
-            cost_terminal (float): The terminal state cost.
-            cost_input (float): The input cost.
+            c_tot (float): The total cost of the MPC solution.
+            c_state (float): The state cost.
+            c_terminal (float): The terminal state cost.
+            c_input (float): The input cost.
         """
         if not self.ocp_ready:
             raise RuntimeError("MPC optimization problem is not initialized.")
 
         # Compute the total cost
-        cost = self.ocp.value
+        c_tot = self.ocp.value
+
+        # Get the state and input variables
+        err = self.q.value - self.q_ref
+        u = self.u.value
 
         # Compute the individual costs
-        cost_state = sum(
-            cp.quad_form(self.q.value[:, k] - self.q_ref[:, k], self.Q)
-            for k in range(self.N)
-        )
-        cost_input = sum(
-            cp.quad_form(self.u.value[:, k], self.R) for k in range(self.N)
-        )
-        cost_terminal = cp.quad_form(
-            self.q.value[:, self.N] - self.q_ref[:, self.N], self.P
-        )
+        c_state = sum(cp.quad_form(err[:, k], self.Q) for k in range(self.N))
+        c_input = sum(cp.quad_form(u[:, k], self.R) for k in range(self.N))
+        c_terminal = cp.quad_form(err[:, self.N], self.P)
 
-        if cost != cost_state + cost_input + cost_terminal:
-            warnings.warn(
-                "Warning: Total cost does not match the sum of individual costs. "
-                f"Total cost: {cost}. State cost: {cost_state}, "
-                f"Input cost: {cost_input}, Terminal cost: {cost_terminal}"
-                f"(sum: {cost_state + cost_input + cost_terminal}).",
-                UserWarning,
-            )
-
-        return cost, cost_state, cost_terminal, cost_input
+        return c_tot, c_state, c_terminal, c_input

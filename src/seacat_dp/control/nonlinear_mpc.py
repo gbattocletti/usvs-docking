@@ -1,6 +1,7 @@
 import warnings
 
 import casadi as ca
+import cvxpy as cp
 import numpy as np
 
 from seacat_dp.control.mpc import Mpc
@@ -374,10 +375,16 @@ class NonlinearMpc(Mpc):
         if self.ocp_ready is False or self.sol is None:
             raise RuntimeError("OCP is not ready or has not been solved yet.")
 
-        # TODO: Implement the cost function computation
-        c_tot = 0.0
-        c_state = 0.0
-        c_input = 0.0
-        c_terminal = 0.0
+        # Get the total cost
+        c_tot = self.sol.value(self.cost_function)
+
+        # Get the state and input variables
+        err = self.sol.value(self.q) - self.ocp.value(self.q_ref)
+        u = self.sol.value(self.u)
+
+        # Compute the individual costs
+        c_state = sum(cp.quad_form(err[:, k], self.Q) for k in range(self.N))
+        c_input = sum(cp.quad_form(u[:, k], self.R) for k in range(self.N))
+        c_terminal = cp.quad_form(err[:, -1], self.P)
 
         return c_tot, c_state, c_input, c_terminal
