@@ -26,13 +26,14 @@ class NonlinearMpc(Mpc):
 
         # Solver options
         # Ipopt options: https://coin-or.github.io/Ipopt/OPTIONS.html
+        self.solver = "ipopt"
         self.solver_options: dict = {
             "max_iter": 10_000,
             "max_wall_time": 10.0,  # Max solver time [s]
             "max_cpu_time": 10.0,  # Max CPU time [s]
             "print_level": 0,  # 0-5 (0 = silent, 5 = verbose)
             "tol": 1e-6,  # Optimality tolerance
-            "acceptable_tol": 1e-4,  # Acceptable tolerance for early termination
+            "acceptable_tol": 1e-4,  # Tolerance for early termination
             "linear_solver": "mumps",  # Recommended for most problems
         }
 
@@ -324,7 +325,7 @@ class NonlinearMpc(Mpc):
 
         # Define the objective and set the solver options
         self.ocp.minimize(self.cost_function)
-        self.ocp.solver("ipopt", self.ocp_options, self.solver_options)
+        self.ocp.solver(self.solver, self.ocp_options, self.solver_options)
 
     def _solve(self, q_0, q_ref, b_curr, b_wind):
         """

@@ -24,8 +24,10 @@ class Mpc:
         self.ocp: cp.Problem | ca.Opti
         self.ocp_ready: bool = False  # Flag to check if the OCP is initialized
         self.update_ocp_automatically: bool = False
-        self.solver_options: dict = {}
-        self.ocp_options: dict = {}
+        self.solver: str
+        self.solver_options: dict = None
+        self.solver_backup_options: dict = None
+        self.ocp_options: dict = None
 
         # Optimization variables
         self.n_u: int = 4  # Number of control inputs

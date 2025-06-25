@@ -1,6 +1,7 @@
 import warnings
 
 import cvxpy as cp
+import gurobipy
 import numpy as np
 from scipy.signal import cont2discrete
 
@@ -28,11 +29,12 @@ class LinearMpc(Mpc):
         self.ocp: cp.Problem  # cvxpy optimization problem
 
         # Initialize the cvxpy solver options
-        self.solver_options: dict = {
-            "solver": cp.OSQP,
+        self._solver: str = None
+        self._solver_options: dict = None
+        self.solver_backup_options: dict = {
+            "solver": cp.MOSEK,
             "verbose": self.verbose,
             "warm_start": True,
-            "max_iter": 500_000,
         }
 
         # Initialize OCP variables
@@ -58,6 +60,120 @@ class LinearMpc(Mpc):
         self.A: cp.Parameter
         self.B: np.ndarray
         self.E: np.ndarray
+
+    @property
+    def solver(self):
+        return self._solver
+
+    @solver.setter
+    def solver(self, solver: str):
+        if solver.upper() not in cp.installed_solvers():
+            raise ValueError(
+                f"Solver {solver} is not installed or supported by cvxpy. "
+                "Available solvers: " + ", ".join(cp.installed_solvers())
+            )
+        self._solver = solver
+        self._solver_options = None  # Reset solver options when solver changes
+        self._solver_options = self.solver_options  # Update solver options
+
+    @property
+    def solver_options(self) -> dict:
+        """
+        Defines the solver options for the MPC optimization problem. The dictionary
+        includes the solver name.
+
+        Returns:
+            dict: A dictionary of solver options. The keys and values depend on the
+            selected solver.
+        """
+        if self._solver_options is None:
+            match self.solver:
+                case "OSQP" | "osqp":
+                    self._solver_options = {
+                        "solver": cp.OSQP,
+                        "verbose": self.verbose,
+                        "warm_start": True,
+                        "max_iter": 500_000,
+                    }
+
+                case "GUROBI" | "gurobi":
+                    gurobi_options = gurobipy.Env()
+                    gurobi_options.setParam("TimeLimit", 1)
+                    self._solver_options = {
+                        "solver": "GUROBI",
+                        "verbose": self.verbose,
+                        "warm_start": True,
+                        "env": gurobi_options,
+                    }
+
+                case "CPLEX" | "cplex":
+                    self._solver_options = {
+                        "solver": cp.CPLEX,
+                        "verbose": self.verbose,
+                        # "verbose": True,
+                        "warm_start": False,
+                        "cplex_params": {
+                            "threads": 8,
+                            "timelimit": 1,
+                            # "output.clonelog": 1,
+                            # "simplex.display": 2,
+                            # "barrier.display": 2,
+                            # "conflict.display": 2,
+                            # "optimalitytarget": 3,
+                            # "simplex.tolerances.feasibility": 1e-6,
+                        },
+                    }
+
+                case "MOSEK" | "mosek":
+                    self._solver_options = {
+                        "solver": cp.MOSEK,
+                        "verbose": self.verbose,
+                        "warm_start": True,
+                        "mosek_params": {},
+                    }
+
+                case "CLARABEL" | "clarabel":
+                    self._solver_options = {
+                        "solver": cp.CLARABEL,
+                        "verbose": self.verbose,
+                        "warm_start": True,
+                        "max_iter": 500_000,
+                    }
+
+                case _:
+                    raise ValueError(f"Solver {self.solver} is not supported.")
+
+        return self._solver_options
+
+    @solver_options.setter
+    def solver_options(self, options: dict | None):
+        """
+        Manually set the solver options for the MPC optimization problem. The options
+        dictionary must include the solver name.
+
+        Args:
+            options (dict): A dictionary of solver options. The keys and values depend
+            on the selected solver.
+        """
+        # Empty or None options (used during initialization of the MPC class)
+        if options is None or options == {}:
+            self._solver_options = options
+
+        # Manual setting of solver options
+        else:
+            if not isinstance(options, dict):
+                raise ValueError("Solver options must be a dictionary.")
+            if "solver" not in options:
+                raise ValueError(
+                    "Solver options must include the 'solver' key with the solver name."
+                )
+            if options["solver"] not in cp.installed_solvers():
+                raise ValueError(
+                    f"Solver {options['solver']} is not installed or supported by "
+                    "cvxpy. Available solvers: " + ", ".join(cp.installed_solvers())
+                )
+
+        self._solver_options = options
 
     def _set_model(self, M_inv: np.ndarray, D_L: np.ndarray, T: np.ndarray, **kwargs):
         """
@@ -129,6 +245,12 @@ class LinearMpc(Mpc):
                 self.A = I + self.Ac * self.dt  # A_d = I + A_c * dt
                 self.B = self.Bc * self.dt  # B_d = B_c * dt
                 self.E = self.Ec * self.dt  # E_d = E_c * dt
+
+            case _:
+                raise ValueError(
+                    f"Discretization method {self.discretization_method} is not "
+                    "supported. "
+                )
 
     def update_model(self, phi: float):
         """
@@ -255,14 +377,26 @@ class LinearMpc(Mpc):
         self.b_wind.value = np.hstack([np.zeros(self.n_q // 2), b_wind])  # (n_q, )
 
         # Solve problem
-        # self.ocp.solve(
-        #     **self.solver_options
-        # )  # TODO: check if options are passed correctly
-
-        # Alternative implementation with explicit solver options
-        self.ocp.solve(
-            solver=cp.OSQP, verbose=self.verbose, warm_start=True, max_iter=500_000
-        )
+        # try:
+        try:
+            self.ocp.solve(**self.solver_options)  # pylint: disable=E1134
+        except cp.error.SolverError as e:
+            if self.solver != self.solver_backup_options["solver"]:
+                warnings.warn(
+                    f"Solver error: {e} while using solver {self.solver}. "
+                    "Attempting to continue with MOSEK solver.",
+                    UserWarning,
+                )
+                self.ocp.solve(**self.solver_backup_options)  # pylint: disable=E1134
+            else:
+                raise RuntimeError(
+                    f"Solver error: {e} while using solver {self.solver}. "
+                    "Check the solver options and problem formulation."
+                ) from e
+        except Exception as e:
+            raise RuntimeError(
+                f"An unexpected error occurred while solving the MPC problem: {e}"
+            ) from e
 
         # Check termination status
         if self.ocp.status != cp.OPTIMAL:
