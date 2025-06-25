@@ -341,7 +341,7 @@ class LinearMpc(Mpc):
         q_ref: np.ndarray,
         b_curr: np.ndarray,
         b_wind: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Solve the linear MPC OCP and compute the control action based on the current
         state and reference.
@@ -362,7 +362,8 @@ class LinearMpc(Mpc):
         Returns:
             u (np.ndarray): The computed control action (n_u, N).
             q (np.ndarray): The predicted state sequence (n_q, N + 1).
-            cost (float): The cost of the MPC solution.
+            c (float): The cost of the MPC solution.
+            t (float): CPU time to solve the MPC problem.
         """
         # Check if the optimization problem is initialized
         if not self.ocp_ready:
@@ -406,8 +407,15 @@ class LinearMpc(Mpc):
                 UserWarning,
             )
 
-        # Return the control sequence and predicted state sequence
-        return self.u.value, self.q.value, self.ocp.value
+        # Get solution
+        u = self.u.value
+        q = self.q.value
+        c = self.ocp.value
+        t = self.ocp.solver_stats.solve_time  # cvxpy wall time
+        # NOTE: cvxpy does not natively provide CPU time. CPU time can be obtained too
+        # but it requires additional solver-specific setup.
+
+        return u, q, c, t
 
     def _cost(self) -> tuple[float, float, float, float]:
         """

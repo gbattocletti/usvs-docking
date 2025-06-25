@@ -15,10 +15,9 @@ from seacat_dp.visualization import plot_functions
 sim_settings = settings.SimSettings()
 # sim_settings.controller = "nonlinear_mpc"
 sim_settings.controller = "linear_mpc"
-linear_solver = "cplex"
 
 # CHANGE SETTINGS HERE
-sim_settings.sim_t_end = 180
+sim_settings.sim_t_end = 120
 sim_settings.q_ref = np.array(
     [
         6.0,  # x position [m]
@@ -100,7 +99,7 @@ b_wind = plant.wind_load(v_wind)  # (3, ) wind force in body frame
 # Initialize MPC controller
 if controller == "linear_mpc":
     mpc = linear_mpc.LinearMpc()
-    mpc.solver = linear_solver
+    mpc.solver = "gurobi"  # modify this to change solver
 elif controller == "nonlinear_mpc":
     mpc = nonlinear_mpc.NonlinearMpc()
 elif controller == "pid":
@@ -127,6 +126,7 @@ w_u = np.zeros(4)  # actuation noise
 q_meas = np.zeros(6)  # measured state
 u = np.zeros(4)  # control input
 cost = 0.0  # mpc cost
+t_sol = 0.0
 
 # Helper variables
 q_0 = np.zeros(6)  # copy of plant.q at the start of the MPC control step
@@ -142,6 +142,7 @@ u_mat = np.zeros((4, sim_n))
 w_q_mat = np.zeros((6, sim_n))
 w_u_mat = np.zeros((4, sim_n))
 cost_mat = np.zeros(sim_n)
+sol_t_mat = np.zeros(sim_n)
 
 # Run the simulation
 initial_time = datetime.datetime.now()
@@ -188,18 +189,8 @@ for i in range(sim_n):
         if controller == "linear_mpc":
             mpc.update_model(q_meas[2])  # linearize the model around current heading
 
-        u_vec, q_pred, cost = mpc.solve(q_meas, q_ref, b_curr, b_wind)  # solve mpc
-
-        # record solution time
-        if controller == "linear_mpc":
-            wall_time = mpc.ocp.solver_stats.solve_time
-            try:
-                # not all solvers provide extra_stats
-                cpu_time = mpc.ocp.solver_stats.extra_stats.get("cpu_time", None)
-            except AttributeError:
-                cpu_time = None
-        elif controller == "nonlinear_mpc":
-            pass  # TODO
+        # solve mpc
+        u_vec, q_pred, cost, t_sol = mpc.solve(q_meas, q_ref, b_curr, b_wind)
 
         # actuation noise and clipping
         u = u_vec[:, 0]  # extract the first control input from the solution
@@ -219,6 +210,7 @@ for i in range(sim_n):
     q_meas_mat[:, i] = q_meas
     u_mat[:, i] = u
     cost_mat[i] = cost
+    sol_t_mat[i] = t_sol
 
     # update time
     ctrl_t += sim_dt
@@ -257,6 +249,7 @@ io.save_sim_data(
     b_curr,
     b_wind,
     cost_mat,
+    sol_t_mat,
 )
 
 # Generate and save plots

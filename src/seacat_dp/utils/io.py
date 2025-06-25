@@ -69,6 +69,7 @@ def save_sim_data(
     b_current: np.ndarray,
     b_wind: np.ndarray,
     cost_mat: np.ndarray,
+    t_sol_mat: np.ndarray,
 ) -> None:
     """
     Run all the save functions that must be executed for every simulation
@@ -94,6 +95,7 @@ def save_sim_data(
         b_current (np.ndarray): current exogenous input. Assumed stationary. (3, )
         b_wind (np.ndarray): wind exogenous input. Assumed stationary. (3, )
         cost_mat (np.ndarray): cost matrix. (N, )
+        t_sol_mat (np.ndarray): solver time vector. (N, )
 
     Returns:
         None
@@ -171,6 +173,7 @@ def save_sim_data(
         "b_current": b_current,
         "b_wind": b_wind,
         "cost_mat": cost_mat,
+        "t_sol_mat": t_sol_mat,
     }
 
     # Write data to pickle file

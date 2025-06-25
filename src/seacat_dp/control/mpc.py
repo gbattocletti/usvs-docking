@@ -576,7 +576,7 @@ class Mpc:
         q_ref: np.ndarray,
         b_curr: np.ndarray = np.zeros(3),
         b_wind: np.ndarray = np.zeros(3),
-    ) -> tuple[np.ndarray, np.ndarray, float]:
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Solve the MPC optimization problem.
 
@@ -603,7 +603,8 @@ class Mpc:
         Returns:
         - u: Optimal control input sequence (n_u, N).
         - q_pred: Predicted state trajectory (n_q, N+1).
-        - c: Computed cost of the MPC solution.
+        - cost: Computed cost of the MPC solution.
+        - time: CPU time to solve the MPC problem [s].
         """
         # Parse inputs
         if q_0.shape != (self.n_q,):
@@ -630,8 +631,8 @@ class Mpc:
             )
 
         # Solve the MPC optimization problem
-        u, x_pred, cost = self._solve(q_0, q_ref, b_curr, b_wind)
-        return u, x_pred, cost
+        u, x_pred, cost, time = self._solve(q_0, q_ref, b_curr, b_wind)
+        return u, x_pred, cost, time
 
     @abstractmethod
     def _solve(
@@ -640,7 +641,7 @@ class Mpc:
         q_ref: np.ndarray,
         b_curr: np.ndarray,
         b_wind: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, float]:
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Internal method to solve the MPC optimization problem. This method must be
         implemented in the subclasses. See the `solve` method for more details on the

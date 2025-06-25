@@ -10,8 +10,8 @@ from seacat_dp.control.mpc import Mpc
 class NonlinearMpc(Mpc):
     """
     Nonlinear Model Predictive Control (MPC) class for controlling a the SeaCat2.
-    The MPC model is nonlinear in the A state matrix, which contains a rotation matrix.
-    Additional nonlinearities can also be added
+    The MPC model is nonlinear in the rotation matrix. Additional nonlinearities
+    can also be added, such as nonlinear damping or Coriolis effects.
     """
 
     def __init__(self):
@@ -43,6 +43,7 @@ class NonlinearMpc(Mpc):
             "error_on_fail": False,
             "print_time": 0,  # Suppress compiler output
             "verbose": False,
+            "record_time": True,  # Record time statistics
         }
 
         # Initialize OCP variables
@@ -327,7 +328,13 @@ class NonlinearMpc(Mpc):
         self.ocp.minimize(self.cost_function)
         self.ocp.solver(self.solver, self.ocp_options, self.solver_options)
 
-    def _solve(self, q_0, q_ref, b_curr, b_wind):
+    def _solve(
+        self,
+        q_0: np.ndarray,
+        q_ref: np.ndarray,
+        b_curr: np.ndarray,
+        b_wind: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Solve the OCP problem for the given initial state and reference state.
         See super().solve() for more details on the arguments and outputs. The input
@@ -338,6 +345,12 @@ class NonlinearMpc(Mpc):
             q_ref (np.ndarray): Reference state sequence (n_q, N+1).
             b_curr (np.ndarray): Current disturbance vector in body frame (3, ).
             b_wind (np.ndarray): Wind disturbance vector in body frame (3, ).
+
+        Returns:
+            u (np.ndarray): The computed control action (n_u, N).
+            q (np.ndarray): The predicted state sequence (n_q, N + 1).
+            c (float): The cost of the MPC solution.
+            t (float): CPU time to solve the MPC problem.
         """
         # Set the initial state
         self.ocp.set_value(self.q_0, q_0)
@@ -349,14 +362,17 @@ class NonlinearMpc(Mpc):
 
         # Solve the OCP problem
         self.sol = self.ocp.solve()
+
         if self.sol.stats()["success"] is not True:
             raise RuntimeError("MPC optimization failed: " + self.sol.stats()["status"])
 
         # Return the OCP solution
-        u_opt = self.sol.value(self.u)
-        q_pred = self.sol.value(self.q)
-        cost = self.sol.value(self.cost_function)
-        return u_opt, q_pred, cost
+        u = self.sol.value(self.u)
+        q = self.sol.value(self.q)
+        c = self.sol.value(self.cost_function)
+        t = self.sol.stats()["t_proc_total"]  # cpu time. Alternative: t_wall_total
+
+        return u, q, c, t
 
     def _cost(self) -> tuple[float, float, float, float]:
         """
