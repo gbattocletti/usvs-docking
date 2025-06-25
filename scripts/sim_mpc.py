@@ -13,15 +13,17 @@ from seacat_dp.visualization import plot_functions
 
 # Load simulation settings
 sim_settings = settings.SimSettings()
-sim_settings.controller = "nonlinear_mpc"
-# sim_settings.controller = "linear_mpc"
+# sim_settings.controller = "nonlinear_mpc"
+sim_settings.controller = "linear_mpc"
+linear_solver = "cplex"
 
 # CHANGE SETTINGS HERE
+sim_settings.sim_t_end = 180
 sim_settings.q_ref = np.array(
     [
-        10.0,  # x position [m]
-        -6.0,  # y position [m]
-        -np.pi,  # yaw angle [rad]
+        6.0,  # x position [m]
+        6.0,  # y position [m]
+        0.0,  # yaw angle [rad]
         0.0,  # x velocity [m/s]
         0.0,  # y velocity [m/s]
         0.0,  # yaw rate [rad/s]
@@ -98,10 +100,9 @@ b_wind = plant.wind_load(v_wind)  # (3, ) wind force in body frame
 # Initialize MPC controller
 if controller == "linear_mpc":
     mpc = linear_mpc.LinearMpc()
-    mpc.set_model(plant.M_inv, plant.D_L, plant.T, phi=plant.q[2])
+    mpc.solver = linear_solver
 elif controller == "nonlinear_mpc":
     mpc = nonlinear_mpc.NonlinearMpc()
-    mpc.set_model(plant.M_inv, plant.D_L, plant.T)
 elif controller == "pid":
     raise NotImplementedError("PID controller is not implemented in this script.")
 else:
@@ -110,6 +111,10 @@ else:
 mpc.set_dt(ctrl_dt)
 mpc.set_horizon(ctrl_N)
 mpc.set_discretization_method(sim_settings.discretization)
+if controller == "linear_mpc":
+    mpc.set_model(plant.M_inv, plant.D_L, plant.T, phi=plant.q[2])
+elif controller == "nonlinear_mpc":
+    mpc.set_model(plant.M_inv, plant.D_L, plant.T)
 mpc.set_weights(sim_settings.Q, sim_settings.R, sim_settings.P)
 mpc.set_input_bounds(sim_settings.u_min, sim_settings.u_max)
 mpc.set_input_rate_bounds(sim_settings.delta_u_min / 5, sim_settings.delta_u_max / 5)
@@ -184,6 +189,17 @@ for i in range(sim_n):
             mpc.update_model(q_meas[2])  # linearize the model around current heading
 
         u_vec, q_pred, cost = mpc.solve(q_meas, q_ref, b_curr, b_wind)  # solve mpc
+
+        # record solution time
+        if controller == "linear_mpc":
+            wall_time = mpc.ocp.solver_stats.solve_time
+            try:
+                # not all solvers provide extra_stats
+                cpu_time = mpc.ocp.solver_stats.extra_stats.get("cpu_time", None)
+            except AttributeError:
+                cpu_time = None
+        elif controller == "nonlinear_mpc":
+            pass  # TODO
 
         # actuation noise and clipping
         u = u_vec[:, 0]  # extract the first control input from the solution

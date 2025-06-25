@@ -13,11 +13,11 @@ class SimSettings:
         # Simulation settings
         self.seed = 1312
         self.sim_dt = 0.001
-        self.sim_t_end = 100.0  # [s] simulation time
+        self.sim_t_end = 120.0  # [s] simulation time
         self.verbose = False
         self.show_plots = False
         self.save_plots = True
-        self.save_anim = True
+        self.save_anim = False
 
         # Controller
         self._controller = "nonlinear_mpc"
@@ -27,7 +27,7 @@ class SimSettings:
             "pid",
         ]
         self._discretization = None
-        self.ctrl_dt = 0.5  # [s] control time step
+        self.ctrl_dt = 0.25  # [s] control time step
         self.ctrl_N = 20  # Prediction horizon
 
         # Cost function
@@ -130,7 +130,7 @@ class SimSettings:
             if self.controller == "linear_mpc":
                 self._discretization = "zoh"
             elif self.controller == "nonlinear_mpc":
-                self._discretization = "euler"
+                self._discretization = "rk4"
             elif self.controller == "pid":
                 self._discretization = None
             else:
