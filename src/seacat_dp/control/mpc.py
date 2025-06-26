@@ -615,6 +615,15 @@ class Mpc:
             )
         if q_ref.shape == (self.n_q,):
             q_ref = np.tile(q_ref[:, np.newaxis], (1, self.N + 1))  # cast to (n_q, N+1)
+        if any(q_ref[2, :] <= -np.pi) or any(q_ref[2, :] > np.pi):
+            # Note: q_ref has now shape (n_q, N+1) so the whole row [2] is checked to
+            # ensure that all angles are in the range (-pi, pi]
+            warnings.warn(
+                "Warning: q_ref contains angles outside the range (-pi, pi]. "
+                "The angles will be rebounded to this range.",
+                UserWarning,
+            )
+            q_ref[2, :] = (q_ref[2, :] + np.pi) % (2 * np.pi) - np.pi
         if b_curr is None:
             b_curr = np.zeros(3)
         elif b_curr.shape != (3,):

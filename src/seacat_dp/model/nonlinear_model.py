@@ -239,6 +239,9 @@ class NonlinearModel:
                 f"Integration method {self.integration_method} not implemented."
             )
 
+        # Correct angle to be in the range (-pi, pi]
+        self.q[2] = (self.q[2] + np.pi) % (2 * np.pi) - np.pi  # normalize angle
+
         # Return the updated state
         return self.q
 

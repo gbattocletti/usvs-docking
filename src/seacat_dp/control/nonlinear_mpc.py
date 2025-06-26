@@ -307,22 +307,20 @@ class NonlinearMpc(Mpc):
         ## Cost function
         # State cost
         for k in range(self.N):
-            self.cost_function += (
-                (self.q[:, k] - self.q_ref[:, k]).T
-                @ self.Q
-                @ (self.q[:, k] - self.q_ref[:, k])
+            err = self.q[:, k] - self.q_ref[:, k]
+            err[2] = (
+                ca.fmod((self.q[2, k] - self.q_ref[2, k] + np.pi), 2 * np.pi) - np.pi
             )
+            self.cost_function += err.T @ self.Q @ err
 
         # Input cost
         for k in range(self.N):
             self.cost_function += self.u[:, k].T @ self.R @ self.u[:, k]
 
         # Terminal cost
-        self.cost_function += (
-            (self.q[:, -1] - self.q_ref[:, -1]).T
-            @ self.P
-            @ (self.q[:, -1] - self.q_ref[:, -1])
-        )
+        err = self.q[:, -1] - self.q_ref[:, -1]
+        err[2] = ca.fmod((self.q[2, -1] - self.q_ref[2, -1] + np.pi), 2 * np.pi) - np.pi
+        self.cost_function += err.T @ self.P @ err
 
         # Define the objective and set the solver options
         self.ocp.minimize(self.cost_function)

@@ -290,13 +290,18 @@ class LinearMpc(Mpc):
         self.b_wind = cp.Parameter((self.n_q,), value=np.zeros(self.n_q))
 
         # Cost function
+        # NOTE: in the current implementation, the angle error is computed as the
+        # difference between the predicted angle and the reference angle, without
+        # considering the periodicity of the angle. This should work for the linear case
+        # but should be checked to make sure it's working as expected.
         cost = 0
         for k in range(self.N):
-            cost += cp.quad_form(self.q[:, k] - self.q_ref[:, k], self.Q)  # state cost
+            err = self.q[:, k] - self.q_ref[:, k]
+            cost += cp.quad_form(err, self.Q)  # state cost
             cost += cp.quad_form(self.u[:, k], self.R)  # input cost
-        cost += cp.quad_form(
-            self.q[:, self.N] - self.q_ref[:, self.N], self.P
-        )  # terminal cost
+
+        err = self.q[:, self.N] - self.q_ref[:, self.N]
+        cost += cp.quad_form(err, self.P)  # terminal cost
 
         # Initial condition
         constraints = [self.q[:, 0] == self.q_0]
