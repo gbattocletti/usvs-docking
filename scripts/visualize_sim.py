@@ -18,7 +18,7 @@ filename = None  # manually select a file
 # visualization options
 SHOW_PLOTS = False
 SAVE_PLOTS = True
-SAVE_ANIM = True
+SAVE_ANIM = False
 
 # move to the directory of the script
 script_dir = Path(__file__).parent
@@ -62,12 +62,24 @@ if not SHOW_PLOTS and not SAVE_PLOTS and not SAVE_ANIM:
 fig_variables, _ = plot_functions.plot_variables(
     t_vec, u_mat, q_mat, q_ref_mat, cost_mat
 )
+# plt.gcf().set_size_inches(6, 6)
+fig_variables.set_figheight(4)
+fig_variables.set_figwidth(4)
+# plt.tight_layout()
+
 fig_phase, _ = plot_functions.phase_plot(q_mat, v_current, v_wind)
+# plt.gcf().set_size_inches(6, 6)
+fig_phase.set_figheight(4)
+fig_phase.set_figwidth(4)
+# plt.tight_layout()
+
 anim = plot_functions.generate_animation(
     t_vec, q_mat, q_ref_mat, u_mat, v_current, v_wind, anim_speed_up_factor
 )
 
 if SAVE_PLOTS:
+    plt.tight_layout()
+
     io.save_figure(fig_variables, filename, "variables")
     io.save_figure(fig_phase, filename, "phase-plot")
 

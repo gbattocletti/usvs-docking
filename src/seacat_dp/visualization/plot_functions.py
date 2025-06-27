@@ -137,7 +137,7 @@ def initialize_phase_plot(
         ax (Axes): Axes object.
     """
     # Initialize figure
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots()  # possible option: figsize=(6, 6)
     ax.set_aspect("equal", "box")
     plt.xlim(x_min, x_max)  # Set x-axis range
     plt.ylim(y_min, y_max)  # Set y-axis range
@@ -179,6 +179,10 @@ def phase_plot(
     x_max = np.max(q_mat[1, :]) + 1
     y_min = np.min(q_mat[0, :]) - 1
     y_max = np.max(q_mat[0, :]) + 1
+    # x_min = -1.6
+    # x_max = 1.1
+    # y_min = -1.1
+    # y_max = 1.6
 
     # Initialize figure
     fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
@@ -189,8 +193,8 @@ def phase_plot(
     origin = np.array([0, 0])
     arrow_inertial_x = np.array([0, 1])
     arrow_inertial_y = np.array([1, 0])
-    plt.arrow(*origin, *arrow_inertial_x, head_width=0.03, color="k")
-    plt.arrow(*origin, *arrow_inertial_y, head_width=0.03, color="k")
+    plt.arrow(*origin, *arrow_inertial_x, head_width=0.05, color="k", linewidth=1.5)
+    plt.arrow(*origin, *arrow_inertial_y, head_width=0.05, color="k", linewidth=1.5)
 
     # Plot body reference frames
     for i in idx:
