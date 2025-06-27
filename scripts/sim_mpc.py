@@ -17,10 +17,10 @@ sim_settings = settings.SimSettings()
 sim_settings.controller = "linear_mpc"
 
 # CHANGE SETTINGS HERE
-sim_settings.sim_t_end = 120
+sim_settings.sim_t_end = 180
 sim_settings.q_ref = np.array(
     [
-        6.0,  # x position [m]
+        10.0,  # x position [m]
         6.0,  # y position [m]
         0.0,  # yaw angle [rad]
         0.0,  # x velocity [m/s]
@@ -28,7 +28,8 @@ sim_settings.q_ref = np.array(
         0.0,  # yaw rate [rad/s]
     ]
 )
-
+sim_settings.v_curr = 0.15  # current speed [m/s]
+sim_settings.h_curr = -np.pi / 2  # current direction [rad]
 
 ########################################################################################
 
@@ -269,7 +270,7 @@ if sim_settings.save_plots is True or sim_settings.show_plots is True:
         q_mat[:, :-1],
         v_curr,
         v_wind,
-        idx=idx_list,
+        # idx=idx_list,
     )
 
 if sim_settings.save_plots is True:

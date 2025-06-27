@@ -13,7 +13,7 @@ class SimSettings:
         # Simulation settings
         self.seed = 1312
         self.sim_dt = 0.001
-        self.sim_t_end = 120.0  # [s] simulation time
+        self.sim_t_end = 100.0  # [s] simulation time
         self.verbose = False
         self.show_plots = False
         self.save_plots = True
@@ -35,10 +35,10 @@ class SimSettings:
             [
                 10e3,  # x
                 10e3,  # y
-                10e2,  # yaw (heading)
+                10e3,  # yaw (heading)
                 10e1,  # x velocity
                 10e1,  # y velocity
-                10e-2,  # yaw rate
+                10e0,  # yaw rate
             ]
         )
         self.R = np.diag(
