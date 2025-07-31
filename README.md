@@ -17,7 +17,7 @@ pip install .
 
 In case you want to install also the dependencies used in the development phase you can run instead:
 ```sh
-pip install -e ".[dev]"
+pip install -e .[dev]
 ```
 
 ## Project Structure
