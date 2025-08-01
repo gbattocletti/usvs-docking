@@ -13,7 +13,7 @@ from matplotlib.animation import FuncAnimation
 from tqdm import tqdm
 
 from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
-from seacat_dp.model import disturbances, nonlinear_model, parameters
+from seacat_dp.model import disturbances, seacat_model, seacat_pars
 from seacat_dp.utils import settings
 
 
@@ -52,9 +52,9 @@ def generate_filename() -> tuple[str, str]:
 
 def save_sim_data(
     sim_name: str,
-    params: parameters.Parameters,
+    params: seacat_pars.SeaCatParameters,
     sim_settings: settings.SimSettings,
-    model: nonlinear_model.NonlinearModel,
+    model: seacat_model.SeaCatModel,
     controller: linear_mpc.LinearMpc | mpc.Mpc | nonlinear_mpc.NonlinearMpc,
     dist: disturbances.Disturbances,
     t_vec: np.ndarray,

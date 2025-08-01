@@ -1,10 +1,10 @@
 import numpy as np
 
-from seacat_dp.model.parameters import Parameters
+from seacat_dp.model.seacat_pars import SeaCatParameters
 from seacat_dp.utils.transformations import R_b2i, R_i2b
 
 
-class NonlinearModel:
+class SeaCatModel:
     """
     Nonlinear 2D model class that computes the nonlinear state and output equations.
 
@@ -34,7 +34,7 @@ class NonlinearModel:
     parameter object.
     """
 
-    def __init__(self, par: Parameters):
+    def __init__(self, par: SeaCatParameters):
         """
         Initialize the nonlinear model of the SeaCat2.
 
@@ -315,7 +315,7 @@ class NonlinearModel:
 
         return f_dot
 
-    def added_mass_surge(self, par: Parameters) -> float:
+    def added_mass_surge(self, par: SeaCatParameters) -> float:
         """
         Computes an approximation of the added mass in surge (i.e., along the x axis)
         for a boat of mass m and length L. The function is adapted from the MSS. Note

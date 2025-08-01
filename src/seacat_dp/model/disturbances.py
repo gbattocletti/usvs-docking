@@ -3,7 +3,8 @@ import numpy as np
 
 class Disturbances:
     """
-    A class for the noise generation for the SeaCat2.
+    A class for the generation of (1) exogenous inputs due to wind and water current,
+    and (2) noise for the state and actuation signals.
     """
 
     def __init__(self):
@@ -18,9 +19,13 @@ class Disturbances:
         self.sigma_v = 0.001  # std of the speed measurement noise [m/s]
         self.sigma_r = 0.0001  # std of the rotation speed measurement noise [rad/s]
 
-        # Actuation noise
-        self.sigma_tau_stern = 0.1  # std of the stern actuation process noise [N]
-        self.sigma_tau_bow = 0.1  # std of the bow actuation process noise [N]
+        # Actuation noise for SeaCat
+        self.sigma_tau_stern = 0.1  # std of the stern actuation noise [N]
+        self.sigma_tau_bow = 0.1  # std of the bow actuation noise [N]
+
+        # Actuation noise for SeaDragon
+        self.sigma_tau_azimuth = 0.1  # std of the azimuth thrusters noise [N]
+        self.sigma_w_azimuth = 0.01  # std of the angular velocity noise [rad/s]
 
         # Water current
         self.current_angle = 0.0  # angle of the water current with respect to the x
@@ -44,6 +49,8 @@ class Disturbances:
             f"sigma_r={self.sigma_r:.2f}\n\t Actuation: "
             f"sigma_tau_stern={self.sigma_tau_stern:.2f}, "
             f"sigma_tau_bow={self.sigma_tau_bow:.2f}\n\t "
+            f"sigma_tau_azimuth={self.sigma_tau_stern:.2f}, "
+            f"sigma_w_azimuth={self.sigma_w_azimuth:.2f}\n\t "
             f" Current: current_angle={self.current_angle:.2f} [rad], "
             f"current_speed={self.current_speed:.2f} [m/s]\n"
         )
@@ -88,15 +95,36 @@ class Disturbances:
         """
         self.wind_speed = speed
 
-    def actuation_noise(self) -> np.ndarray:
+    def actuation_noise_seacat(self) -> np.ndarray:
         """
-        Generates a noise vector with the same shape as the force vector f (4, ).
+        Generates a noise vector with the same shape as the SeaCat's force vector.
+
+        Returns:
+            noise (np.ndarray): noise vector with shape (4, ) representing the actuation
+            noise for the SeaCat's thrusters.
         """
         noise = np.zeros(4)
         noise[0] = np.random.normal(0, self.sigma_tau_stern)
         noise[1] = np.random.normal(0, self.sigma_tau_stern)
         noise[2] = np.random.normal(0, self.sigma_tau_bow)
         noise[3] = np.random.normal(0, self.sigma_tau_bow)
+        return noise
+
+    def actuation_noise_seadragon(self) -> np.ndarray:
+        """
+        Generates a noise vector with the same shape as the SeaDragon's actuation
+        vector, where the first two elements are thrust forces and the last two are
+        the angular velocities of the azimuth thrusters.
+
+        Returns:
+            noise (np.ndarray): noise vector with shape (4, ) representing the actuation
+            noise for the SeaDragon's thrusters.
+        """
+        noise = np.zeros(4)
+        noise[0] = np.random.normal(0, self.sigma_tau_azimuth)
+        noise[1] = np.random.normal(0, self.sigma_tau_azimuth)
+        noise[2] = np.random.normal(0, self.sigma_w_azimuth)
+        noise[3] = np.random.normal(0, self.sigma_w_azimuth)
         return noise
 
     def measurement_noise(self) -> np.ndarray:

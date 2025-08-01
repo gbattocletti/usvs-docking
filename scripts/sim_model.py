@@ -4,7 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from seacat_dp.model import disturbances, nonlinear_model, parameters
+from seacat_dp.model import disturbances, seacat_model, seacat_pars
 from seacat_dp.utils import io
 from seacat_dp.visualization import plot_functions
 
@@ -24,8 +24,8 @@ n = int(t_end / dt)  # number of time steps
 t_vec = dt * np.arange(n)  # time vector [s]
 
 # Initialize the model
-params = parameters.Parameters()
-model = nonlinear_model.NonlinearModel(params)
+params = seacat_pars.SeaCatParameters()
+model = seacat_model.SeaCatModel(params)
 model.set_time_step(dt)  # set the time step for the model
 model.set_integration_method("euler")  # set the integration method for the model
 model.set_initial_conditions(np.zeros(6))  # set the initial conditions for
