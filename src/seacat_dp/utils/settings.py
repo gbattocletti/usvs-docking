@@ -107,20 +107,22 @@ class SimSettings:
                 params.max_bow_thrust_backward,
             ]
         )  # [N]
+        # TODO: check how to make this vector more general (SeaDragon case)
         self.delta_u_max = np.array(
             [
-                params.max_stern_thrust_forward / params.t_stern * self.ctrl_dt,
-                params.max_stern_thrust_forward / params.t_stern * self.ctrl_dt,
-                params.max_bow_thrust_forward / params.t_bow * self.ctrl_dt,
-                params.max_bow_thrust_forward / params.t_bow * self.ctrl_dt,
+                params.max_stern_thrust_forward / params.delay_stern * self.ctrl_dt,
+                params.max_stern_thrust_forward / params.delay_stern * self.ctrl_dt,
+                params.max_bow_thrust_forward / params.delay_bow * self.ctrl_dt,
+                params.max_bow_thrust_forward / params.delay_bow * self.ctrl_dt,
             ]
         )  # [N/s]
+        # TODO: check how to make this vector more general (SeaDragon case)
         self.delta_u_min = np.array(
             [
-                params.max_stern_thrust_backward / params.t_stern * self.ctrl_dt,
-                params.max_stern_thrust_backward / params.t_stern * self.ctrl_dt,
-                params.max_bow_thrust_backward / params.t_bow * self.ctrl_dt,
-                params.max_bow_thrust_backward / params.t_bow * self.ctrl_dt,
+                params.max_stern_thrust_backward / params.delay_stern * self.ctrl_dt,
+                params.max_stern_thrust_backward / params.delay_stern * self.ctrl_dt,
+                params.max_bow_thrust_backward / params.delay_bow * self.ctrl_dt,
+                params.max_bow_thrust_backward / params.delay_bow * self.ctrl_dt,
             ]
         )  # [N/s]
 

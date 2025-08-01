@@ -33,6 +33,10 @@ class Parameters:
         self.I_yy: float  # inertia around y axis [kg*m^2]
         self.I_zz: float  # inertia around z axis [kg*m^2]
 
+        # Time constants
+        self.t_sway: float  # sway time constant [s]
+        self.t_yaw: float  # yaw time constant [s]
+
         # Thrusters geometric data
         self.l_thrusters: float  # distance from y axis to thrusters [m]
         self.b_thrusters: float  # distance from x axis to thrusters [m]
@@ -44,6 +48,7 @@ class Parameters:
         # The other thrusters force parameters are USV-dependant and are defined in the
         # specific USV parameters class.
 
-        # Time constants
-        self.t_sway: float  # sway time constant [s]
-        self.t_yaw: float  # yaw time constant [s]
+        # Thrusters time constants
+        # The thrusters time constants are USV-dependant since they depend on the
+        # specific number and configuration of the thrusters. They are specified in the
+        # specific USV parameters class.

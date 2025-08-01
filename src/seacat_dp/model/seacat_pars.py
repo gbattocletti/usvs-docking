@@ -52,5 +52,5 @@ class SeaCatParameters:
         # backward force at 5.5 knots (2.7m/s) [N]
 
         # Thrusters time constants
-        self.t_bow: float = 1
-        self.t_stern: float = 1
+        self.delay_bow: float = 1
+        self.delay_stern: float = 1

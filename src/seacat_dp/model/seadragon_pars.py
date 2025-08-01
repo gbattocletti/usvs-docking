@@ -31,6 +31,10 @@ class SeaDragonParameters(Parameters):
         self.I_yy: float = 650.0  # placeholder value, TODO
         self.I_zz: float = 700.0  # placeholder value, TODO
 
+        # Time constants
+        self.t_sway: float = 1.0
+        self.t_yaw: float = 1.0
+
         # Thrusters geometric data
         self.l_thrusters: float = 1.52
         self.b_thrusters: float = self.y_pontoon
@@ -41,6 +45,5 @@ class SeaDragonParameters(Parameters):
         self.max_thrust_max_u: float = 100  # placeholder values, TODO
         self.max_thrust_angular_speed: float = 1.35  # Max thrusters rot speed [rad/s]
 
-        # Time constants
-        self.t_sway: float = 1.0
-        self.t_yaw: float = 1.0
+        # Thrusters time delay
+        self.delay_thrusters: float = 1
