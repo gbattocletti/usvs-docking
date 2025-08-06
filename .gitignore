@@ -1,6 +1,7 @@
 # Blacklist development folders
 dev/
 results/
+.env
 
 # Project files
 .vscode/
