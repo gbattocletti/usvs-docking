@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from seacat_dp.control import linear_mpc, nonlinear_mpc
-from seacat_dp.model import disturbances, seacat_model, seacat_pars
+from seacat_dp.model import disturbances, model_seacat, parameters_seacat
 from seacat_dp.utils import io, settings
 from seacat_dp.visualization import plot_functions
 
@@ -80,8 +80,8 @@ ctrl_N = sim_settings.ctrl_N  # prediction horizon [steps]
 controller = sim_settings.controller  # controller type
 
 # Initialize model
-params = seacat_pars.SeaCatParameters()
-plant = seacat_model.SeaCatModel(params)
+params = parameters_seacat.SeaCatParameters()
+plant = model_seacat.SeaCatModel(params)
 plant.set_time_step(sim_dt)
 plant.set_integration_method("rk4")
 plant.set_initial_conditions(sim_settings.q_0)

@@ -1,6 +1,6 @@
 import numpy as np
 
-from seacat_dp.model import seacat_pars
+from seacat_dp.model import parameters_seacat
 
 
 class SimSettings:
@@ -90,7 +90,7 @@ class SimSettings:
         self.h_wind = 0.0
 
         # Controller bounds
-        params = seacat_pars.SeaCatParameters()
+        params = parameters_seacat.SeaCatParameters()
         self.u_max = np.array(
             [
                 params.max_stern_thrust_forward,

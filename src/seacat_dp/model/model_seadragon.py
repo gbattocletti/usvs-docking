@@ -2,7 +2,7 @@ import numpy as np
 
 from seacat_dp.model import hydrodynamics, wind_dynamics
 from seacat_dp.model.model import USVModel
-from seacat_dp.model.seadragon_pars import SeaDragonParameters
+from seacat_dp.model.parameters_seadragon import SeaDragonParameters
 from seacat_dp.utils.transformations import R_b2i
 
 
