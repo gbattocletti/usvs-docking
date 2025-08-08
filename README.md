@@ -1,7 +1,7 @@
 # SeaCat2 Dynamic Positioning Control
 
- [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
- ![Python 3.11](https://img.shields.io/badge/python->=3.11-green.svg)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+![Python 3.11](https://img.shields.io/badge/python->=3.11-green.svg)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 This repository contains a collection of dynamic models and controllers for the dynamic positioning of an autonomous Unmanned Surface Vehicle (USV). The target USV is the SeaCAT2, used in the [SeaClear2 project](https://www.seaclear2.eu/).
@@ -39,16 +39,12 @@ root/
 │   ├── ...
 |   └── sim_visualization.py    # script to generate plots and animations from a sim
 │
-├── src                         # main package (importable with -e)
-│   └── seacat_dp/              # python package name (use for import)
-│       ├── __init__.py
-│       ├── models/             # usv models and parameters
-│       ├── utils/              # utilities (I/O management...)
-│       └── visualization/      # plot and animation functions
-│
-└── tests/                      # unit/integration tests
-    ├── __init__.py
-    └── ...                     # TODO
+└── src                         # main package (importable with -e)
+    └── seacat_dp/              # python package name (use for import)
+        ├── __init__.py
+        ├── models/             # usv models and parameters
+        ├── utils/              # utilities (I/O management...)
+        └── visualization/      # plot and animation functions
 ```
 
 All the relevant simulations are stored in the `scripts/` folder, while all the models, controllers, and required modules are stored under `src/seacat_dp/`
