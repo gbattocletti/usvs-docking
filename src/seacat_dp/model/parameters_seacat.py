@@ -1,4 +1,7 @@
-class SeaCatParameters:
+from seacat_dp.model.parameters import Parameters
+
+
+class SeaCatParameters(Parameters):
     """
     A class to hold the parameters for the SeaCat2. See the Parameters class for a
     description of the parameters.
@@ -9,6 +12,7 @@ class SeaCatParameters:
     """
 
     def __init__(self):
+        super().__init__()
 
         # Geometric data
         self.l_tot: float = 5.7
