@@ -79,6 +79,8 @@ def plot_variables(
     ax[0].plot(t_vec, u_mat[3, :])
     ax[0].set(xlabel="", ylabel="$u$ [N]")
     ax[0].grid()
+    ax[0].set_axisbelow(True)
+
     ax[0].legend(["$u_1$", "$u_2$", "$u_3$", "$u_4$"])
 
     # Plot x, y
@@ -89,6 +91,7 @@ def plot_variables(
         ax[1].plot(t_vec, q_ref_mat[1, :], "--", color="k")
     ax[1].set(xlabel="", ylabel="$x, y$ [m]")
     ax[1].grid()
+    ax[1].set_axisbelow(True)
     ax[1].legend(["$x$", "$y$"])
 
     # Plot theta
@@ -97,6 +100,7 @@ def plot_variables(
         ax[2].plot(t_vec, q_ref_mat[2, :], "--", color="k")
     ax[2].set(xlabel="", ylabel=r"$\psi$ [rad]")
     ax[2].grid()
+    ax[2].set_axisbelow(True)
     ax[2].set_ylim(-np.pi, np.pi)
 
     # Plot u, v
@@ -104,18 +108,21 @@ def plot_variables(
     ax[3].plot(t_vec, q_mat[4, :])
     ax[3].set(xlabel="", ylabel=r"$u, v$ [m/s]")
     ax[3].grid()
+    ax[3].set_axisbelow(True)
     ax[3].legend(["$u$", "$v$"])
 
     # Plot omega
     ax[4].plot(t_vec, q_mat[5, :])
     ax[4].set(xlabel="time [s]", ylabel=r"$\omega$ [rad/s]")
     ax[4].grid()
+    ax[4].set_axisbelow(True)
 
     # Plot cost
     if cost_mat is not None:
         ax[5].plot(t_vec, cost_mat)
         ax[5].set(xlabel="time [s]", ylabel="cost")
         ax[5].grid()
+        ax[5].set_axisbelow(True)
 
     # Return figure and axes
     return fig, ax
@@ -188,13 +195,18 @@ def phase_plot(
     fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
     ax.grid()
     ax.grid(which="minor", linestyle=":", linewidth="0.5", color="gray")
+    ax.set_axisbelow(True)
 
     # World reference frame
     origin = np.array([0, 0])
     arrow_inertial_x = np.array([0, 1])
     arrow_inertial_y = np.array([1, 0])
-    plt.arrow(*origin, *arrow_inertial_x, head_width=0.05, color="k", linewidth=1.5)
-    plt.arrow(*origin, *arrow_inertial_y, head_width=0.05, color="k", linewidth=1.5)
+    plt.arrow(
+        *origin, *arrow_inertial_x, head_width=0.05, color="k", linewidth=1.5, zorder=10
+    )
+    plt.arrow(
+        *origin, *arrow_inertial_y, head_width=0.05, color="k", linewidth=1.5, zorder=10
+    )
 
     # Plot body reference frames
     for i in idx:
@@ -220,6 +232,7 @@ def phase_plot(
             dy=arrow_body_x[1],
             head_width=0.02,
             color="b",
+            zorder=9,
         )
         plt.arrow(
             x=robot[0],
@@ -228,6 +241,7 @@ def phase_plot(
             dy=arrow_body_y[1],
             head_width=0.02,
             color="b",
+            zorder=9,
         )
 
     # Create a grid of points for the vector fields
@@ -247,7 +261,7 @@ def phase_plot(
         v_y_mat = np.ones_like(Y) * v_y
 
         # Plot the vector field
-        plt.quiver(X, Y, v_x_mat, v_y_mat, color="blue")
+        plt.quiver(X, Y, v_x_mat, v_y_mat, color="blue", width=0.003, zorder=4)
 
     # Plot wind disturbance
     if v_wind is not None and np.linalg.norm(v_wind) > 0:
@@ -259,12 +273,12 @@ def phase_plot(
         v_y_mat = np.ones_like(Y) * v_y
 
         # Plot the vector field
-        plt.quiver(X, Y, v_x_mat, v_y_mat, color="green")
+        plt.quiver(X, Y, v_x_mat, v_y_mat, color="green", width=0.003, zorder=5)
 
     # Trajectory (rotated to match the orientation of the inertial frame)
     x = q_mat[1, :]
     y = q_mat[0, :]
-    ax.plot(x, y)
+    ax.plot(x, y, linewidth=2, zorder=8)
 
     # Return figure and axes
     return fig, ax
@@ -422,6 +436,7 @@ def generate_animation(
     fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
     ax.grid()
     ax.grid(which="minor", linestyle=":", linewidth="0.5", color="gray")
+    ax.set_axisbelow(True)
     title = ax.set_title(f"2D Trajectory (t = {t_vec[0]:.2f} s)", fontsize=10)
 
     # Determine number of frames to generate
@@ -522,6 +537,7 @@ def generate_animation(
     ax_u.set_xlim(0, np.max(t_vec))
     ax_u.set_ylim(-1000, 1200)  # Thrusters force limits
     ax_u.grid()
+    ax_u.set_axisbelow(True)
     ax_u.set_title("Thrusters forces", fontsize=10)
 
     # Initialize empty lines for progressive filling
