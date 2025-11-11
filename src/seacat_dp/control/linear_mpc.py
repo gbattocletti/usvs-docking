@@ -1,5 +1,3 @@
-import warnings
-
 import cvxpy as cp
 import gurobipy
 import numpy as np
@@ -7,6 +5,7 @@ from scipy.signal import cont2discrete
 
 from seacat_dp.control.mpc import Mpc
 from seacat_dp.utils.transformations import R_b2i
+from seacat_dp.visualization.colors import CmdColors
 
 
 class LinearMpc(Mpc):
@@ -388,10 +387,10 @@ class LinearMpc(Mpc):
             self.ocp.solve(**self.solver_options)  # pylint: disable=E1134
         except cp.error.SolverError as e:
             if self.solver != self.solver_backup_options["solver"]:
-                warnings.warn(
-                    f"Solver error: {e} while using solver {self.solver}. "
-                    "Attempting to continue with MOSEK solver.",
-                    UserWarning,
+                print(
+                    f"{CmdColors.WARNING}[Linear MPC]{CmdColors.ENDC} {e} Solver error "
+                    f"while using solver {self.solver}. Attempting to continue with "
+                    "MOSEK backup solver."
                 )
                 self.ocp.solve(**self.solver_backup_options)  # pylint: disable=E1134
             else:
@@ -406,10 +405,10 @@ class LinearMpc(Mpc):
 
         # Check termination status
         if self.ocp.status != cp.OPTIMAL:
-            warnings.warn(
+            print(
+                f"{CmdColors.WARNING}[Linear MPC]{CmdColors.ENDC} "
                 "Warning: MPC problem not solved to optimality. "
-                f"Solve status: {self.ocp.status}",
-                UserWarning,
+                f"Solve status: {self.ocp.status}"
             )
 
         # Get solution
