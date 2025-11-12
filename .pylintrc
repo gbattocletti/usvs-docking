@@ -1,4 +1,6 @@
 [MASTER]
+ignore=dev
+ignore-paths=^dev/.*,
 disable=
     invalid-name,  # C0103 (variable name "x" doesn't conform to snake_case naming style)
     missing-module-docstring, # C0114
@@ -19,8 +21,6 @@ disable=
     no-else-raise, # R1720
 
     fixme # W0511
-
-ignore=dev
 
 [FORMAT]
 max-line-length=88
