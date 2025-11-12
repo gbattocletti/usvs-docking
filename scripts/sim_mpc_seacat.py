@@ -16,7 +16,7 @@ from seacat_dp.model import (
     wind_dynamics,
 )
 from seacat_dp.utils import io, settings
-from seacat_dp.visualization import plot_functions
+from seacat_dp.visualization import animate, plot
 
 # Load simulation settings
 sim_settings = settings.SimSettings()
@@ -284,7 +284,7 @@ fig_variables = None  # Initialize to None to avoid errors
 fig_phase = None
 
 if sim_settings.save_plots is True or sim_settings.show_plots is True:
-    fig_variables, _ = plot_functions.plot_variables(
+    fig_variables, _ = plot.plot_variables(
         t_vec,
         u_mat,
         q_mat[:, :-1],
@@ -292,7 +292,7 @@ if sim_settings.save_plots is True or sim_settings.show_plots is True:
         cost_mat,
     )
     idx_list = list(np.linspace(0, sim_n, num=int(sim_n / 10000) + 1, dtype=int))
-    fig_phase, _ = plot_functions.phase_plot(
+    fig_phase, _ = plot.phase_plot(
         q_mat[:, :-1],
         v_curr,
         v_wind,
@@ -306,10 +306,9 @@ if sim_settings.save_plots is True:
 if sim_settings.show_plots is True:
     plt.show(block=False)
 
-# Generate and save animation
 if sim_settings.save_anim is True:
     speed_up_factor = 500
-    anim = plot_functions.generate_animation(
+    anim = animate.generate_animation(
         t_vec,
         q_mat[:, :-1],
         q_ref_mat,
@@ -317,5 +316,5 @@ if sim_settings.save_anim is True:
         v_curr,
         v_wind,
         speed_up_factor,
-    )
+    )  # Generate and save animation
     io.save_animation(anim, sim_name)

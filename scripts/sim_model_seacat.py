@@ -7,7 +7,7 @@ import numpy as np
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
 from seacat_dp.model import disturbances, model_seacat, parameters_seacat
-from seacat_dp.visualization import plot_functions
+from seacat_dp.visualization import plot
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent
@@ -80,6 +80,6 @@ with Progress(
 print("Simulation completed.")
 
 # Plot the simulation data
-plot_functions.plot_variables(t_vec, u_mat, q_mat[:, :-1])
-plot_functions.phase_plot(q_mat[:, :-1], v_current, v_wind)
+plot.plot_variables(t_vec, u_mat, q_mat[:, :-1])
+plot.phase_plot(q_mat[:, :-1], v_current, v_wind)
 plt.show()

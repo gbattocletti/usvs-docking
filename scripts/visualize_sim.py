@@ -9,7 +9,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from seacat_dp.utils import io
-from seacat_dp.visualization import plot_functions
+from seacat_dp.visualization import animate, plot
 
 # select data to visualize
 filename = None  # manually select a file
@@ -59,22 +59,26 @@ if not SHOW_PLOTS and not SAVE_PLOTS and not SAVE_ANIM:
     print("No plots or animations will be generated. Exiting.")
     sys.exit(0)
 
-fig_variables, _ = plot_functions.plot_variables(
-    t_vec, u_mat, q_mat, q_ref_mat, cost_mat
-)
+fig_variables, _ = plot.plot_variables(t_vec, u_mat, q_mat, q_ref_mat, cost_mat)
 # plt.gcf().set_size_inches(6, 6)
 fig_variables.set_figheight(4)
 fig_variables.set_figwidth(4)
 # plt.tight_layout()
 
-fig_phase, _ = plot_functions.phase_plot(q_mat, v_current, v_wind)
+fig_phase, _ = plot.phase_plot(q_mat, v_current, v_wind)
 # plt.gcf().set_size_inches(6, 6)
 fig_phase.set_figheight(4)
 fig_phase.set_figwidth(4)
 # plt.tight_layout()
 
-anim = plot_functions.generate_animation(
-    t_vec, q_mat, q_ref_mat, u_mat, v_current, v_wind, anim_speed_up_factor
+anim = animate.generate_animation(
+    t_vec,
+    q_mat,
+    q_ref_mat,
+    u_mat,
+    v_current,
+    v_wind,
+    anim_speed_up_factor,
 )
 
 if SAVE_PLOTS:
