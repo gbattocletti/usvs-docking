@@ -49,16 +49,7 @@ class SimSettings:
                 10e-2,  # bow right
             ]
         )
-        self.P = self.Q = np.diag(
-            [
-                10e3,  # x
-                10e3,  # y
-                10e2,  # yaw (heading)
-                10e1,  # x velocity
-                10e1,  # y velocity
-                10e-2,  # yaw rate
-            ]
-        )
+        self.P = self.Q  # Terminal cost
 
         # Initial state and reference
         self.q_0 = np.array(
