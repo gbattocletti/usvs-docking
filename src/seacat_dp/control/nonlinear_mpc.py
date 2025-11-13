@@ -1,10 +1,9 @@
-import warnings
-
 import casadi as ca
 import cvxpy as cp
 import numpy as np
 
 from seacat_dp.control.mpc import Mpc
+from seacat_dp.visualization.colors import CmdColors
 
 
 class NonlinearMpc(Mpc):
@@ -60,26 +59,73 @@ class NonlinearMpc(Mpc):
         # Check model discretization method
         self.discretization_options = ["euler", "rk4"]  # class-specific options
 
-        # Class-specific model parameters and constants
-        self.M_inv: np.ndarray = None
-        self.D_L: np.ndarray = None
-        self.T: np.ndarray = None
-        self.D_NL: np.ndarray = None  # Nonlinear damping (optional)
-        self.C: np.ndarray = None  # Coriolis matrix (optional)
+        # Model parameters (MPC prediction model)
+        self.M_inv: np.ndarray | None = None
+        self.D_L: np.ndarray | None = None
+        self.D_NL: np.ndarray | None = None  # Nonlinear damping (optional)
+        self.C: np.ndarray | None = None  # Coriolis matrix (optional)
+
+        # Model parameters related to thrusters (MPC prediction model)
+        self.azimuth_thrusters: bool = False
+        self.pars_b_thrusters: float | None = None
+        self.pars_l_thrusters: float | None = None
+        self.T: np.ndarray | None = None  # used only if azimuth_thrusters is False
 
     def _set_model(
         self,
         M_inv: np.ndarray,
         D_L: np.ndarray,
-        T: np.ndarray,
+        T: np.ndarray | None = None,
         **kwargs: dict,
     ):
         """
         Defines the model parameters for the MPC nonlinear prediction model.
+
+        Args:
+            M_inv (np.ndarray): (n_q, n_q) inverse of the mass matrix.
+            D_L (np.ndarray): (n_q, n_q) linear damping matrix.
+            T (np.ndarray | None, optional): (n_q, n_u) thrusters configuration matrix.
+                If self.azimuth_thrusters is True, T is expected to be set to None. If
+                not, it is ignored with a warning. If azimuth_thrusters is False, but
+                T is not provided, an error is raised.
+
+        Kwargs:
+            azimuth_thrusters (bool, optional): whether the model uses azimuth
+                thrusters. Default is False. If True, T is ignored.
+            pars_b_thrusters (float, optional): distance of the thrusters from the
+                centerline of the vehicle (required if azimuth_thrusters is True).
+            pars_l_thrusters (float, optional): distance of the thrusters from the
+                center of gravity of the vehicle along the x axis (required if
+                azimuth_thrusters is True).
+            D_NL (np.ndarray, optional): (n_q, n_q) nonlinear damping matrix.
+            C (np.ndarray, optional): (n_q, n_q) Coriolis matrix.
+            phi: Ignored keyword argument.
+
+        Returns:
+            None
         """
         # Parse kwargs
         for key, value in kwargs.items():
-            if key == "D_NL":
+            if key == "azimuth_thrusters":
+                if not isinstance(value, bool):
+                    raise TypeError(
+                        "Expected 'azimuth_thrusters' to be a boolean, "
+                        f"got {type(value)}."
+                    )
+                self.azimuth_thrusters = value
+            elif key == "pars_b_thrusters":
+                if not isinstance(value, (float, int)):
+                    raise TypeError(
+                        f"Expected 'pars_b_thrusters' to be a float, got {type(value)}."
+                    )
+                self.pars_b_thrusters = float(value)
+            elif key == "pars_l_thrusters":
+                if not isinstance(value, (float, int)):
+                    raise TypeError(
+                        f"Expected 'pars_l_thrusters' to be a float, got {type(value)}."
+                    )
+                self.pars_l_thrusters = float(value)
+            elif key == "D_NL":
                 if not isinstance(value, np.ndarray):
                     raise TypeError(
                         f"Expected 'D_NL' to be a numpy array, got {type(value)}."
@@ -101,28 +147,57 @@ class NonlinearMpc(Mpc):
                         f"got {value.shape}."
                     )
                 self.C = value
-                warnings.warn(
+                print(
+                    f"{CmdColors.WARNING}[NMPC]{CmdColors.ENDC} "
                     "The 'C' keyword is currently not used in the nonlinear MPC class."
                     "The value of the matrix will be stored but not used in the "
                     "dynamic model",
-                    UserWarning,
                 )
             elif key == "phi":
-                warnings.warn(
+                print(
+                    f"{CmdColors.WARNING}[NMPC]{CmdColors.ENDC} "
                     "The 'phi' keyword is not used in the nonlinear MPC class and it "
                     "will be ignored during the model definition.",
-                    UserWarning,
                 )
             else:
                 raise ValueError(
                     f"Unknown keyword argument '{key}' for nonlinear MPC model."
                 )
+        # Validate inputs
+        if self.azimuth_thrusters is True:
+            if self.T is not None:
+                print(
+                    f"{CmdColors.WARNING}[NMPC]{CmdColors.ENDC} azimuth_thrusters is "
+                    "set to True but a 'T' matrix has been provided. T will be ignored."
+                )
+                self.T = None
+            else:
+                self.T = T
+            if self.pars_b_thrusters is None or self.pars_l_thrusters is None:
+                raise ValueError(
+                    "When 'azimuth_thrusters' is True, 'pars_b_thrusters' and "
+                    "'pars_l_thrusters' must be provided."
+                )
+        if self.azimuth_thrusters is False:
+            if self.T is None:
+                raise ValueError(
+                    "The 'T' matrix must be provided when 'azimuth_thrusters' is "
+                    "False."
+                )
+            elif self.pars_b_thrusters is not None or self.pars_l_thrusters is not None:
+                print(
+                    f"{CmdColors.WARNING}[NMPC]{CmdColors.ENDC} azimuth_thrusters is "
+                    "set to False but 'pars_b_thrusters' and/or "
+                    "'pars_l_thrusters' have been provided. They will be ignored."
+                )
+                self.pars_b_thrusters = None
+                self.pars_l_thrusters = None
 
         # Save the model parameters
         # NOTE: the type and shape of these parameters is checked in super().set_model()
         self.M_inv = M_inv
         self.D_L = D_L
-        self.T = T
+        # self.T is already set above
 
     def _dqdt(
         self,
@@ -165,10 +240,32 @@ class NonlinearMpc(Mpc):
                 "Please remove it from the model parameters."
             )
 
+        if self.azimuth_thrusters is True:
+            # Compute force generated by the azimuth thrusters in body frame
+            f = np.array(
+                [
+                    u[0] * np.cos(u[2]) + u[1] * np.cos(u[3]),
+                    u[0] * np.sin(u[2]) + u[1] * np.sin(u[3]),
+                    u[0]
+                    * (
+                        np.cos(u[2]) * self.pars_b_thrusters
+                        - u[0] * np.sin(u[2]) * self.pars_l_thrusters
+                    )
+                    - u[1]
+                    * (
+                        np.cos(u[3]) * self.pars_b_thrusters
+                        + u[1] * np.sin(u[3]) * self.pars_l_thrusters
+                    ),
+                ]
+            )
+        else:
+            # Compute force generated by the fixed thrusters in body frame through
+            # the constant thrust allocation matrix T
+            f = self.T @ u
+
         # Nonlinear dynamics
         dx = R @ q[3:6]
-        dv = self.M_inv @ (-D @ q[3:6] + self.T @ u + b_curr + b_wind)
-
+        dv = self.M_inv @ (-D @ q[3:6] + f + b_curr + b_wind)
         return ca.vertcat(dx, dv)
 
     def _init_ocp(self):
