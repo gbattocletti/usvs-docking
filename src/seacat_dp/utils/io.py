@@ -1,20 +1,20 @@
+import datetime
 import os
 import pickle
 import tkinter as tk
-from datetime import datetime
 from pickletools import optimize
 from tkinter import filedialog
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-# import tqdm
 from matplotlib.animation import FuncAnimation
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from tqdm import tqdm
 
 from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
 from seacat_dp.model import disturbances, model_seacat, parameters_seacat
 from seacat_dp.utils import settings
+from seacat_dp.visualization.colors import CmdColors
 
 
 def generate_filename() -> tuple[str, str]:
@@ -35,7 +35,7 @@ def generate_filename() -> tuple[str, str]:
         os.makedirs("results")
 
     # Generate unique simulation name
-    date = datetime.now().strftime("%Y-%m-%d")
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
     counter = 0
     while os.path.isdir(f"results\\{date}-{counter:04}"):
         counter += 1
@@ -120,7 +120,7 @@ def save_sim_data(
     # Write README file
     with open(txt_filename, "w") as f:
         f.write(f"# Simulation Settings {sim_name}\n")
-        f.write(f"## Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"## Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
         f.write("\n## Parameters:\n")
         f.write(f"\t Simulation time: {t_vec[-1]:.2f} s\n")
@@ -265,14 +265,31 @@ def save_figure(fig: plt.Figure, sim_name: str, name: str) -> None:
     print("Figure saving completed.")
 
 
-def save_animation(anim: FuncAnimation, sim_name: str) -> None:
+def save_animation(anim: FuncAnimation, sim_name: str, **kwargs) -> None:
     """
     Save the animation to a file.
 
     Args:
         anim (FuncAnimation): The animation object to save.
         sim_name (str): The name of the file to save the animation to.
+
+    Kwargs:
+        legacy_progress_bar (bool): If True, use tqdm for progress bar. If False, use
+            rich. Default is False.
     """
+    # Parse kwargs
+    legacy_progress_bar: bool = False
+    for key, value in kwargs.items():
+        if key == "legacy_progress_bar":
+            if not isinstance(value, bool):
+                raise TypeError("legacy_progress_bar must be a boolean value.")
+            legacy_progress_bar = value
+        else:
+            print(
+                f"{CmdColors.WARNING}[Animate]{CmdColors.ENDC} Unrecognized kwarg "
+                f"'{key}' passed to generate_animation()."
+            )
+
     # Parse sim name
     if sim_name.endswith(".gif"):
         sim_name.replace(".gif", "")
@@ -282,24 +299,63 @@ def save_animation(anim: FuncAnimation, sim_name: str) -> None:
 
     # Save animation
     total_frames = anim._save_count  # pylint: disable=protected-access
-    with tqdm(total=total_frames, desc="Generating animation") as pbar:
-        anim.save(
-            filename,
-            writer="pillow",  # or "ffmpeg" for MP4
-            dpi=150,
-            progress_callback=lambda i, bar: progress_callback(i, pbar),
-        )
+
+    # Use rich progress bar
+    if legacy_progress_bar:
+        with tqdm(total=total_frames, desc="Generating animation") as pbar:
+            initial_time = datetime.datetime.now()
+
+            def tqdm_progress_callback(current_frame: int, _total_frames: int) -> None:
+                """
+                Update the tqdm progress bar during animation saving.
+
+                Args:
+                    current_frame (int): The current frame number.
+                    _total_frames (int): The total number of frames (unused).
+                """
+                # Update the progress bar
+                pbar.n = current_frame
+                pbar.refresh()
+
+            anim.save(
+                filename,
+                writer="pillow",  # or "ffmpeg" for MP4
+                dpi=150,
+                progress_callback=tqdm_progress_callback,
+            )
+    else:
+        with Progress(
+            TextColumn("[bold blue]{task.description}"),  # custom label
+            BarColumn(),  # progress bar
+            "[progress.percentage]{task.percentage:>3.0f}%",  # completion percentage
+            "{task.fields[iteration]}",  # iteration %
+            TimeElapsedColumn(),  # elapsed real time
+        ) as progress:
+            initial_time = datetime.datetime.now()
+            task = progress.add_task(
+                f"Saving simulation [{initial_time.strftime('%H:%M:%S')}]",
+                total=total_frames,
+                iteration=0,
+            )
+
+            # Define the rich progress callback
+            def rich_progress_callback(current_frame: int, total_frames: int) -> None:
+                """
+                Callback to update the rich progress bar during animation saving.
+
+                Args:
+                    current_frame (int): The current frame number.
+                    total_frames (int): The total number of frames.
+
+                """
+                progress.update(
+                    task, advance=1, iteration=current_frame, total=total_frames
+                )
+
+            anim.save(
+                filename,
+                writer="pillow",  # or "ffmpeg" for MP4
+                dpi=150,
+                progress_callback=rich_progress_callback,
+            )
     print(f"Animation saved as {filename}")
-
-
-def progress_callback(current_frame: int, pbar: tqdm) -> None:
-    """
-    Update the progress bar during animation saving.
-
-    Args:
-        current_frame (int): The current frame number.
-        pbar (tqdm): The tqdm progress bar instance to update.
-    """
-    # Update the progress bar
-    pbar.n = current_frame
-    pbar.refresh()
