@@ -2,9 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.animation import FuncAnimation
 from matplotlib.lines import Line2D
-from matplotlib.patches import FancyArrow, Rectangle
+from matplotlib.patches import FancyArrow, Polygon, Rectangle
 
 from seacat_dp.utils.transformations import R_i2b
+from seacat_dp.visualization.colors import CmdColors
 from seacat_dp.visualization.plot import initialize_phase_plot
 
 
@@ -17,6 +18,7 @@ def animation_step(
     arr_body_x: FancyArrow,
     arr_body_y: FancyArrow,
     traj_body: list[Line2D],
+    poly: Polygon,
     arr_ref_x: FancyArrow,
     arr_ref_y: FancyArrow,
     u_line_0: list[Line2D],
@@ -29,6 +31,7 @@ def animation_step(
     FancyArrow,
     FancyArrow,
     Line2D,
+    Polygon,
     FancyArrow,
     FancyArrow,
     Line2D,
@@ -49,6 +52,7 @@ def animation_step(
         arr_body_x (FancyArrow): Arrow object for x-axis.
         arr_body_y (FancyArrow): Arrow object for y-axis.
         traj_body (Line2D): Trajectory plot object.
+        poly (Polygon): Polygon object for the robot body.
         arr_ref_x (FancyArrow): Arrow object for x-axis of reference RF.
         arr_ref_y (FancyArrow): Arrow object for y-axis of reference RF.
         u_line_0 (Line2D): Line object for the first input force.
@@ -84,7 +88,10 @@ def animation_step(
         x=q_mat[1, idx], y=q_mat[0, idx], dx=y_arrow_body[0], dy=y_arrow_body[1]
     )
 
-    # Update reference reference frame
+    # Update box
+    poly.set_xy(generate_box_points(q_mat[1, idx], q_mat[0, idx], psi_body))
+
+    # Update target reference frame
     psi_ref = q_ref_mat[2, idx]
     R_ref = R_i2b(psi_ref)[0:2, 0:2]
     x_arrow_ref = R_ref.dot(arr_inertial_x)
@@ -115,6 +122,7 @@ def animation_step(
         arr_body_x,
         arr_body_y,
         traj_body,
+        poly,
         arr_ref_x,
         arr_ref_y,
         u_line_0,
@@ -132,6 +140,7 @@ def generate_animation(
     v_current: np.ndarray,
     v_wind: np.ndarray,
     speed_up_factor: int = 1,
+    **kwargs,
 ) -> FuncAnimation:
     """
     Animate the trajectory of the robot in the phase space (x-y plane).
@@ -145,9 +154,24 @@ def generate_animation(
         v_wind (np.ndarray): Wind velocity vector (3, ). Assumed stationary.
         speed_up_factor (int, optional): Speed-up factor for the animation.
 
+    Kwargs:
+        subplot_legend (bool, optional): Whether to show legend in the actuators
+            subplot. Default is False.
     Returns:
         anim (FuncAnimation): Animation object.
     """
+    # Parse kwargs
+    subplot_legend: bool = False
+    for key, value in kwargs.items():
+        if key == "subplot_legend":
+            if not isinstance(value, bool):
+                raise TypeError("subplot_legend must be a boolean value.")
+            subplot_legend = value
+        else:
+            print(
+                f"{CmdColors.WARNING}[Animate]{CmdColors.ENDC} Unrecognized kwarg "
+                f"'{key}' passed to generate_animation()."
+            )
 
     # Initialize figure
     # Compute bounds:
@@ -170,8 +194,8 @@ def generate_animation(
     origin_body = np.array([0, 0])
     arrow_inertial_x = np.array([0, 1])
     arrow_inertial_y = np.array([1, 0])
-    plt.arrow(*origin_body, *arrow_inertial_x, head_width=0.03, color="k")
-    plt.arrow(*origin_body, *arrow_inertial_y, head_width=0.03, color="k")
+    plt.arrow(*origin_body, *arrow_inertial_x, head_width=0.03, color="k", zorder=10)
+    plt.arrow(*origin_body, *arrow_inertial_y, head_width=0.03, color="k", zorder=10)
 
     # Create a grid of points for the vector fields
     grid_delta_x = 1.0
@@ -186,7 +210,15 @@ def generate_animation(
         v_y = v_current[0]
         v_x_mat = np.ones_like(grid_X) * v_x
         v_y_mat = np.ones_like(grid_Y) * v_y
-        plt.quiver(grid_X, grid_Y, v_x_mat, v_y_mat, color="blue")
+        plt.quiver(
+            grid_X,
+            grid_Y,
+            v_x_mat,
+            v_y_mat,
+            color="blue",
+            width=0.003,
+            zorder=4,
+        )
 
     # Plot wind vector field (static)
     if v_wind is not None and np.linalg.norm(v_wind) > 0:
@@ -194,7 +226,15 @@ def generate_animation(
         v_y = v_wind[0]
         v_x_mat = np.ones_like(grid_X) * v_x
         v_y_mat = np.ones_like(grid_Y) * v_y
-        plt.quiver(grid_X, grid_Y, v_x_mat, v_y_mat, color="green")
+        plt.quiver(
+            grid_X,
+            grid_Y,
+            v_x_mat,
+            v_y_mat,
+            color="green",
+            width=0.003,
+            zorder=5,
+        )
 
     # Trajectory (animated)
     x = q_mat[1, 0]
@@ -216,6 +256,7 @@ def generate_animation(
         dy=arrow_body_x[1],
         head_width=0.02,
         color="b",
+        zorder=9,
     )
     arr_body_y = plt.arrow(
         origin_body[0],
@@ -224,7 +265,23 @@ def generate_animation(
         dy=arrow_body_y[1],
         head_width=0.02,
         color="b",
+        zorder=9,
     )
+
+    # Body shape (animated)
+    poly = Polygon(
+        generate_box_points(
+            origin_body[0],
+            origin_body[1],
+            psi_body,
+        ),
+        closed=True,
+        fill=False,
+        edgecolor="b",
+        linewidth=1,
+        zorder=8,
+    )
+    ax.add_patch(poly)
 
     # Target reference frame (animated)
     psi_ref = q_ref_mat[2, 0]
@@ -241,6 +298,7 @@ def generate_animation(
         dy=arrow_ref_x[1],
         head_width=0.012,
         color="k",
+        zorder=7,
     )
     arr_ref_y = plt.arrow(
         origin_ref[0],
@@ -249,11 +307,12 @@ def generate_animation(
         dy=arrow_ref_y[1],
         head_width=0.012,
         color="k",
+        zorder=7,
     )
 
     # Add actuators subplot
     # Position: [left, bottom, width, height] (w.r.t. main plot)
-    ax_u = plt.axes([0.15, 0.65, 0.2, 0.2])  # Top-left corner
+    ax_u = plt.axes([0.15, 0.65, 0.3, 0.2])  # Top-left corner
     rect = Rectangle((0, -2), 10, 4, alpha=0.2, color="gray")
     ax_u.add_patch(rect)
     ax_u.set_xlabel("t [s]")
@@ -271,16 +330,17 @@ def generate_animation(
     (u_line_3,) = ax_u.plot([], [], color="gold", lw=1)
 
     # Add legend to the actuators subplot
-    ax_u.legend(
-        [
-            "$u_1$",
-            "$u_2$",
-            "$u_3$",
-            "$u_4$",
-        ],
-        loc="upper left",
-        fontsize=8,
-    )
+    if subplot_legend is True:
+        ax_u.legend(
+            [
+                "$u_1$",
+                "$u_2$",
+                "$u_3$",
+                "$u_4$",
+            ],
+            loc="upper left",
+            fontsize=8,
+        )
 
     # Generate the animation
     anim = FuncAnimation(
@@ -294,6 +354,7 @@ def generate_animation(
             arr_body_x,
             arr_body_y,
             traj_body,
+            poly,
             arr_ref_x,
             arr_ref_y,
             u_line_0,
@@ -311,3 +372,47 @@ def generate_animation(
 
     # Save the animation
     return anim
+
+
+def generate_box_points(
+    x: float,
+    y: float,
+    heading: float,
+) -> np.ndarray:
+    """
+    Generate the vertices of a rectangle given its center, heading, width, and height.
+
+    Args:
+        x (float): x-coordinate of the rectangle center.
+        y (float): y-coordinate of the rectangle center.
+        heading (float): Heading angle of the rectangle in radians.
+
+    Returns:
+        np.ndarray: Array of shape (4, 2) containing the vertices of the rectangle
+    """
+    # Rectangle dimensions
+    width: float = 0.8
+    height: float = 1.6
+    bow_length: float = 0.4
+
+    # centered rectangle vertices
+    pts = np.array(
+        [
+            [-width / 2, -height / 2],
+            [width / 2, -height / 2],
+            [width / 2, height / 2],
+            [0, height / 2 + bow_length],  # bow point to indicate forward direction
+            [-width / 2, height / 2],
+        ]
+    )
+
+    # rotation matrix
+    R = np.array(
+        [
+            [np.cos(heading), -np.sin(heading)],
+            [np.sin(heading), np.cos(heading)],
+        ]
+    )
+
+    # rotate and translate points
+    return pts @ R + np.array([x, y])
