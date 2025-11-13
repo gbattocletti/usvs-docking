@@ -20,23 +20,45 @@ from seacat_dp.visualization import animate, plot
 
 # Load simulation settings
 sim_settings = settings.SimSettings()
-# sim_settings.controller = "nonlinear_mpc"
-sim_settings.controller = "linear_mpc"
 
-# CHANGE SETTINGS HERE
-sim_settings.sim_t_end = 180
+### MANUAL CUSTOMIZATION OF SIMULATION SETTINGS ########################################
+
+# Custom simulation settings
+sim_settings.sim_t_end = 360.0  # simulation duration [s]
 sim_settings.q_ref = np.array(
     [
         10.0,  # x position [m]
-        6.0,  # y position [m]
-        0.0,  # yaw angle [rad]
+        2.0,  # y position [m]
+        np.pi / 3,  # yaw angle [rad]
         0.0,  # x velocity [m/s]
         0.0,  # y velocity [m/s]
         0.0,  # yaw rate [rad/s]
     ]
 )
-sim_settings.v_curr = 0.15  # current speed [m/s]
-sim_settings.h_curr = +np.pi / 4  # current direction [rad]
+
+# Controller settings
+sim_settings.controller = "nonlinear_mpc"  # linear_mpc or nonlinear_mpc
+sim_settings.ctrl_N = 20  # Prediction horizon
+sim_settings.ctrl_dt = 0.5  # control time step [s]
+sim_settings.Q = np.diag(
+    [
+        10e3,  # x position
+        10e3,  # y position
+        10e1,  # yaw (heading)
+        10e1,  # x velocity
+        10e1,  # y velocity
+        10e0,  # yaw rate
+    ]
+)
+
+# Exogenous disturbances
+sim_settings.v_wind = 0.0  # wind speed [m/s]
+sim_settings.h_wind = 0.0  # wind direction [rad]
+sim_settings.v_curr = 0.0  # current speed [m/s]
+sim_settings.h_curr = 0.0  # current direction [rad]
+
+# Plot settings
+sim_settings.save_anim = True
 
 ########################################################################################
 
