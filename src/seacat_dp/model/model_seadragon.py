@@ -179,7 +179,7 @@ class SeaDragonModel(USVModel):
             self.pars.max_thrust_angular_speed,
         )
 
-        u_dot = [delta_force_l, delta_force_r, delta_alpha_l, delta_alpha_r]
+        u_dot = np.array([delta_force_l, delta_force_r, delta_alpha_l, delta_alpha_r])
         return u_dot
 
     def thrusters_saturation(self, u: np.ndarray) -> np.ndarray:
