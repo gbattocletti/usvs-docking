@@ -1,12 +1,11 @@
-import datetime
 import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
 from seacat_dp.model import disturbances, model_seadragon, parameters_seadragon
+from seacat_dp.utils.wrappers import progress_sim
 from seacat_dp.visualization import plot
 
 # Set cwd to the script directory
@@ -53,35 +52,19 @@ q_meas_mat = np.zeros((6, sim_n))  # state time series
 u_mat = np.zeros((4, sim_n))  # control input time series
 
 # Run the simulation
-initial_time = datetime.datetime.now()
-with Progress(
-    TextColumn("[bold blue]{task.description}"),  # custom label (defined in add_task)
-    BarColumn(),  # progress bar
-    "[progress.percentage]{task.percentage:>3.0f}%",  # completion percentage
-    "Sim time: {task.fields[sim_time]:.2f}s",  # simulation time
-    TimeElapsedColumn(),  # elapsed real time
-) as progress:
-    task = progress.add_task(
-        f"Running simulation [{initial_time.strftime('%H:%M:%S')}]",
-        total=sim_n,
-        sim_time=0.0,
-    )
-    for i in range(sim_n):
+for i in progress_sim(range(sim_n), dt=sim_dt):
 
-        # plant
-        q = model(u, v_current, v_wind)  # update the model state
+    # plant
+    q = model(u, v_current, v_wind)  # update the model state
 
-        # store step data
-        q_mat[:, i + 1] = q
-        w_mat[:, i] = w  # noise
-        q_meas_mat[:, i] = q_meas  # measured state
-        u_mat[:, i] = u  # control input
+    # store step data
+    q_mat[:, i + 1] = q
+    w_mat[:, i] = w  # noise
+    q_meas_mat[:, i] = q_meas  # measured state
+    u_mat[:, i] = u  # control input
 
-        # update time
-        t += sim_dt
-        progress.update(task, advance=1, sim_time=i * sim_dt)
-
-print("Simulation completed.")
+    # update time
+    t += sim_dt
 
 # Plot the simulation data
 plot.plot_variables(t_vec, u_mat, q_mat[:, :-1])
