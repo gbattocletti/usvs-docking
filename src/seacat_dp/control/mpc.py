@@ -484,7 +484,7 @@ class Mpc:
         self,
         M_inv: np.ndarray,
         D_L: np.ndarray,
-        T: np.ndarray,
+        T: np.ndarray | None = None,
         **kwargs: dict,
     ):
         """
@@ -493,7 +493,7 @@ class Mpc:
         Parameters:
         - M_inv (np.ndarray): Inverse of the mass matrix (n_q/2, n_q/2).
         - D_L (np.ndarray): Linear damping matrix (n_q/2, n_q/2).
-        - T (np.ndarray): Transformation matrix (n_q/2, n_u).
+        - T (np.ndarray, optional): Transformation matrix (n_q/2, n_u). Default is None.
         - **kwargs (dict): Additional keyword arguments for the specific MPC subclasses.
             The kwargs are passed directly to the `_set_model` method of the subclass.
         """
@@ -509,9 +509,9 @@ class Mpc:
             raise TypeError(f"D_L must be a numpy array, got {type(D_L)}")
         if D_L.shape != (n_v, n_v):
             raise ValueError(f"D_L must be of shape ({n_v}, {n_v}), got {D_L.shape}")
-        if not isinstance(T, np.ndarray):
-            raise TypeError(f"T must be a numpy array, got {type(T)}")
-        if T.shape != (n_v, self.n_u):
+        if not (isinstance(T, np.ndarray) or T is None):
+            raise TypeError(f"T must be a numpy array or None, got {type(T)}")
+        if T is not None and T.shape != (n_v, self.n_u):
             raise ValueError(f"T must be of shape ({n_v}, {self.n_u}), got {T.shape}")
 
         # Call the class-specific method to set the model
@@ -522,7 +522,7 @@ class Mpc:
         self,
         M_inv: np.ndarray,
         D_L: np.ndarray,
-        T: np.ndarray,
+        T: np.ndarray | None = None,
         **kwargs: dict,
     ):
         """
