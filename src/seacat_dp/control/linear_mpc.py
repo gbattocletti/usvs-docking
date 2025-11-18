@@ -174,14 +174,21 @@ class LinearMpc(Mpc):
 
         self._solver_options = options
 
-    def _set_model(self, M_inv: np.ndarray, D_L: np.ndarray, T: np.ndarray, **kwargs):
+    def _set_model(
+        self,
+        M_inv: np.ndarray,
+        D_L: np.ndarray,
+        T: np.ndarray | None = None,
+        **kwargs: dict,
+    ):
         """
         Set the continuous- and discrete-time LTI prediction model.
 
         Args:
             M_inv: (np.ndarray): Inverse of the inertia matrix (3, 3).
             D_L (np.ndarray): Linear damping matrix (3, 3).
-            T (np.ndarray): Thrust matrix (3, 4).
+            T (np.ndarray): Thrust matrix (3, 4). Default is None only for signature
+                compatibility, but raises an error if not provided.
             **kwargs (dict): Additional keyword arguments. Avaiable keys:
                 phi (float): The angle around which to linearize the state
                 matrix A [rad].
@@ -200,6 +207,10 @@ class LinearMpc(Mpc):
             raise ValueError(
                 "Heading angle phi must be provided as a keyword argument."
             )
+
+        # Validate inputs
+        if T is None:
+            raise ValueError("Thrust matrix T must be provided.")
 
         # Check if the problem is already initialized
         self._warn_if_initialized()
