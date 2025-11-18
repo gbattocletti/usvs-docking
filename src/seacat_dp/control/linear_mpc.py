@@ -345,6 +345,7 @@ class LinearMpc(Mpc):
         q_ref: np.ndarray,
         b_curr: np.ndarray,
         b_wind: np.ndarray,
+        _: bool,  # ignore use_warm_start for LinearMpc
     ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Solve the linear MPC OCP and compute the control action based on the current

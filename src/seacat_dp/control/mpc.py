@@ -576,6 +576,7 @@ class Mpc:
         q_ref: np.ndarray,
         b_curr: np.ndarray = np.zeros(3),
         b_wind: np.ndarray = np.zeros(3),
+        use_warm_start: bool = True,
     ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Solve the MPC optimization problem.
@@ -593,6 +594,8 @@ class Mpc:
         - b_wind (np.ndarray, optional): Wind force expressed in the body reference
             frame (3, ). The force is assumed to be stationary over the horizon.
             Default is a zero vector.
+        - use_warm_start (bool, optional): Whether to use warm starting for the solver.
+            Affects only NonlinearMpc. Default is True.
 
         Raises:
         - ValueError: If q_0, q_ref, b_curr, or b_wind are not of the expected shapes.
@@ -640,7 +643,13 @@ class Mpc:
             )
 
         # Solve the MPC optimization problem
-        u, x_pred, cost, time = self._solve(q_0, q_ref, b_curr, b_wind)
+        u, x_pred, cost, time = self._solve(
+            q_0,
+            q_ref,
+            b_curr,
+            b_wind,
+            use_warm_start=use_warm_start,
+        )
         return u, x_pred, cost, time
 
     @abstractmethod
@@ -650,6 +659,7 @@ class Mpc:
         q_ref: np.ndarray,
         b_curr: np.ndarray,
         b_wind: np.ndarray,
+        use_warm_start: bool,
     ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Internal method to solve the MPC optimization problem. This method must be

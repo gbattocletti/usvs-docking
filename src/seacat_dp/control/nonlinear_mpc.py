@@ -21,7 +21,10 @@ class NonlinearMpc(Mpc):
 
         # Initialize the OCP problem
         self.ocp = ca.Opti()
-        self.sol = None  # Solution to the OCP problem. To access stats sol.stats()
+
+        # Solution to the OCP problem. Used to retrieve solution and to provide initial
+        # guess for next optimization (warm start).
+        self.sol: ca.OptiSol | None = None
 
         # Solver options
         # Ipopt options: https://coin-or.github.io/Ipopt/OPTIONS.html
@@ -429,6 +432,7 @@ class NonlinearMpc(Mpc):
         q_ref: np.ndarray,
         b_curr: np.ndarray,
         b_wind: np.ndarray,
+        use_warm_start: bool = True,
     ) -> tuple[np.ndarray, np.ndarray, float, float]:
         """
         Solve the OCP problem for the given initial state and reference state.
@@ -454,6 +458,10 @@ class NonlinearMpc(Mpc):
         # Set the disturbances
         self.ocp.set_value(self.b_curr, b_curr)  # (3, )
         self.ocp.set_value(self.b_wind, b_wind)  # (3, )
+
+        # Set the initial guess (warm start) if available
+        if use_warm_start is True and self.sol is not None:
+            self.ocp.set_initial(self.sol.value_variables())
 
         # Solve the OCP problem
         self.sol = self.ocp.solve()
