@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
 from seacat_dp.model import disturbances, model_seacat, parameters_seacat
-from seacat_dp.utils import settings
+from seacat_dp.utils import settings_sa
 from seacat_dp.visualization.colors import CmdColors
 
 
@@ -53,7 +53,7 @@ def generate_filename() -> tuple[str, str]:
 def save_sim_data(
     sim_name: str,
     params: parameters_seacat.SeaCatParameters,
-    sim_settings: settings.SimSettings,
+    sim_settings: settings_sa.SimSettings,
     model: model_seacat.SeaCatModel,
     controller: linear_mpc.LinearMpc | mpc.Mpc | nonlinear_mpc.NonlinearMpc,
     dist: disturbances.Disturbances,

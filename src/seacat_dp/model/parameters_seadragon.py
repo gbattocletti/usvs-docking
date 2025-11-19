@@ -41,9 +41,9 @@ class SeaDragonParameters(Parameters):
 
         # Thrusters force and maximum speed
         self.u_max: float = 3.4  # Maximum forward speed corresponding to 6.6 knots
-        self.max_thrust: float = 100  # placeholder values, TODO
-        self.max_thrust_max_u: float = 100  # placeholder values, TODO
-        self.max_thrust_angular_speed: float = 1.35  # Max thrusters rot speed [rad/s]
+        self.max_thrust: float = 100  # Max forward thrust [N]
+        self.max_thrust_backward: float = -100  # Max backward thrust [N]
+        self.max_thrust_angular_speed: float = 0.2  # Max thrusters rot speed [rad/s]
 
         # Thrusters time delay
         self.delay_thrusters: float = 1
