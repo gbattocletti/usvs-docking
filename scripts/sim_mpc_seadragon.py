@@ -5,7 +5,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
 from seacat_dp.control import nonlinear_mpc
 from seacat_dp.model import (
@@ -16,6 +15,7 @@ from seacat_dp.model import (
     wind_dynamics,
 )
 from seacat_dp.utils import io, settings
+from seacat_dp.utils.wrappers import progress_sim
 from seacat_dp.visualization import animate, plot
 
 # Load simulation settings
@@ -23,13 +23,15 @@ sim_settings = settings.SimSettings()
 
 ### MANUAL CUSTOMIZATION OF SIMULATION SETTINGS ########################################
 
+DEBUG = False  # enable/disable debug mode
+
 # Custom simulation settings
-sim_settings.sim_t_end = 360.0  # simulation duration [s]
+sim_settings.sim_t_end = 60.0  # simulation duration [s]
 sim_settings.q_ref = np.array(
     [
-        10.0,  # x position [m]
-        2.0,  # y position [m]
-        np.pi / 3,  # yaw angle [rad]
+        8.0,  # x position [m]
+        8.0,  # y position [m]
+        0.0,  # yaw angle [rad]
         0.0,  # x velocity [m/s]
         0.0,  # y velocity [m/s]
         0.0,  # yaw rate [rad/s]
@@ -37,17 +39,25 @@ sim_settings.q_ref = np.array(
 )
 
 # Controller settings
-sim_settings.controller = "nonlinear_mpc"  # linear_mpc or nonlinear_mpc
+sim_settings.controller = "nonlinear_mpc"  # only available option for SeaDragon
 sim_settings.ctrl_N = 20  # Prediction horizon
 sim_settings.ctrl_dt = 0.5  # control time step [s]
 sim_settings.Q = np.diag(
     [
         10e3,  # x position
         10e3,  # y position
-        10e1,  # yaw (heading)
-        10e1,  # x velocity
-        10e1,  # y velocity
+        10e2,  # yaw (heading)
+        10e0,  # x velocity
+        10e0,  # y velocity
         10e0,  # yaw rate
+    ]
+)
+sim_settings.R = np.diag(
+    [
+        10e-1,  # stern left
+        10e-1,  # stern right
+        10e-3,  # angle left
+        10e-3,  # angle right
     ]
 )
 
@@ -139,7 +149,8 @@ mpc.set_model(
     azimuth_thrusters=True,
     pars_b_thrusters=0.85,
     pars_l_thrusters=1.52,
-)
+)  # CHECKME --> check parameters and correctness of the model
+# TODO: compare MPC predction with actual plant update
 mpc.set_weights(sim_settings.Q, sim_settings.R, sim_settings.P)
 mpc.set_input_bounds(sim_settings.u_min, sim_settings.u_max)
 mpc.set_input_rate_bounds(sim_settings.delta_u_min / 5, sim_settings.delta_u_max / 5)
@@ -171,100 +182,56 @@ cost_mat = np.zeros(sim_n)
 sol_t_mat = np.zeros(sim_n)
 
 # Run the simulation
-initial_time = datetime.datetime.now()
-with Progress(
-    TextColumn("[bold blue]{task.description}"),  # custom label (defined in add_task)
-    BarColumn(),  # progress bar
-    "[progress.percentage]{task.percentage:>3.0f}%",  # completion percentage
-    "Sim time: {task.fields[sim_time]:.2f}s",  # simulation time
-    TimeElapsedColumn(),  # elapsed real time
-) as progress:
-    task = progress.add_task(
-        f"Running simulation [{initial_time.strftime('%H:%M:%S')}]",
-        total=sim_n,
-        sim_time=0.0,
-    )
-    for i in range(sim_n):
+for i in progress_sim(range(sim_n), dt=sim_dt):
 
-        # update control input
-        if ctrl_t == 0.0 or ctrl_t >= ctrl_dt:
+    # update control input
+    if ctrl_t == 0.0 or ctrl_t >= ctrl_dt:
 
-            # Print information if verbose mode is enabled
-            # NOTE: to be able to display the updated plant state, the information is
-            # printed at the beginning of the next control step, when the plant dynamics
-            # has been rolled out for ctrl_n time steps.
-            if sim_settings.verbose and i != 0:
-                i_prev = max(0, i - ctrl_n)
-                print(
-                    f"\nt = {i}/{sim_n} [{i / sim_n * 100:.4f}%]:"
-                    f"\n\tq plant =\t[{q_0[0]:.4f}, {q_0[1]:.4f}, {q_0[2]:.4f}, "
-                    f"{q_0[3]:.4f}, {q_0[4]:.4f}, {q_0[5]:.4f}]"
-                    f"\n\tq+ plant =\t[{plant.q[0]:.4f}, {plant.q[1]:.4f}, "
-                    f"{plant.q[2]:.4f}, {plant.q[3]:.4f}, {plant.q[4]:.4f}, "
-                    f"{plant.q[5]:.4f}]"
-                    f"\n\tw =\t\t[{w_q[0]:.4f}, {w_q[1]:.4f}, {w_q[2]:.4f}, "
-                    f"{w_q[3]:.4f}, {w_q[4]:.4f}, {w_q[5]:.4f}]"
-                    f"\n\tq mpc =\t\t[{q_pred[0, 0]:.4f}, {q_pred[1, 0]:.4f}, "
-                    f"{q_pred[2, 0]:.4f}, {q_pred[3, 0]:.4f}, {q_pred[4, 0]:.4f}, "
-                    f"{q_pred[5, 0]:.4f}]"
-                    f"\n\tq+ mpc =\t[{q_pred[0, 1]:.4f}, {q_pred[1, 1]:.4f}, "
-                    f"{q_pred[2, 1]:.4f}, {q_pred[3, 1]:.4f}, {q_pred[4, 1]:.4f}, "
-                    f"{q_pred[5, 1]:.4f}]"
-                    f"\n\tu =\t\t[{u[0]:.4f}, {u[1]:.4f}, {u[2]:.4f}, {u[3]:.4f}]"
-                    f"\n\tw_u =\t\t[{w_u[0]:.4f}, {w_u[1]:.4f}, "  # cont. on next line
-                    f"{w_u[2]:.4f}, {w_u[3]:.4f}]"
-                    f"\n\tb_curr =\t[{b_curr[0]:.4f}, {b_curr[1]:.4f}, {b_curr[2]:.4f}]"
-                    f"\n\tb_wind =\t[{b_wind[0]:.4f}, {b_wind[1]:.4f}, {b_wind[2]:.4f}]"
-                    f"\n\tcost mpc =\t{cost:.4f}"
-                )
+        q_0 = plant.q  # save the current state (used for debug when VERBOSE)
+        w_q = dist.measurement_noise()  # generate measurement noise
+        w_q = np.zeros(6)  # DEBUG: disable measurement noise
+        q_meas = plant.q + w_q  # measure the state (with noise)
 
-            q_0 = plant.q  # save the current state (used for debug when VERBOSE)
-            w_q = dist.measurement_noise()  # generate measurement noise
-            q_meas = plant.q + w_q  # measure the state (with noise)
+        # Estimate disturbances (currently: exact measurement)
+        b_curr = hydrodynamics.crossflow_drag(
+            plant.q, params, v_curr
+        )  # (3, ) measure current force in body RF
+        b_wind = wind_dynamics.wind_load(
+            plant.q, v_wind
+        )  # (3, ) measure wind force in body RF
 
-            # Estimate disturbances (currently: exact measurement)
-            b_curr = hydrodynamics.crossflow_drag(
-                plant.q, params, v_curr
-            )  # (3, ) measure current force in body RF
-            b_wind = wind_dynamics.wind_load(
-                plant.q, v_wind
-            )  # (3, ) measure wind force in body RF
+        # solve mpc
+        u_vec, q_pred, cost, t_sol = mpc.solve(
+            q_meas,
+            q_ref,
+            b_curr,
+            b_wind,
+            use_warm_start=True,
+        )
 
-            if controller == "linear_mpc":
-                mpc.update_model(
-                    q_meas[2]
-                )  # linearize the model around current heading
+        # actuation noise and clipping
+        u = u_vec[:, 0]  # extract the first control input from the solution
+        w_u = dist.actuation_noise_seadragon()  # generate actuation noise
+        w_u = np.zeros(4)  # DEBUG: disable actuation noise
+        u = u + w_u  # add actuation noise
+        u = np.clip(u, sim_settings.u_min, sim_settings.u_max)  # enforce input bounds
+        ctrl_t = 0.0  # reset the elapsed time
 
-            # solve mpc
-            u_vec, q_pred, cost, t_sol = mpc.solve(q_meas, q_ref, b_curr, b_wind)
+    # perform one plant time step
+    plant.step(u, v_curr, v_wind)
 
-            # actuation noise and clipping
-            u = u_vec[:, 0]  # extract the first control input from the solution
-            w_u = dist.actuation_noise_seacat()  # generate actuation noise
-            u = u + w_u  # add actuation noise
-            u = np.clip(
-                u, sim_settings.u_min, sim_settings.u_max
-            )  # enforce input bounds
-            ctrl_t = 0.0  # reset the elapsed time
+    # store step data
+    q_mat[:, i + 1] = plant.q
+    q_ref_mat[:, i] = q_ref
+    w_q_mat[:, i] = w_q
+    w_u_mat[:, i] = w_u
+    q_meas_mat[:, i] = q_meas
+    u_mat[:, i] = u
+    cost_mat[i] = cost
+    sol_t_mat[i] = t_sol
 
-        # perform one plant time step
-        plant.step(u, v_curr, v_wind)
-
-        # store step data
-        q_mat[:, i + 1] = plant.q
-        q_ref_mat[:, i] = q_ref
-        w_q_mat[:, i] = w_q
-        w_u_mat[:, i] = w_u
-        q_meas_mat[:, i] = q_meas
-        u_mat[:, i] = u
-        cost_mat[i] = cost
-        sol_t_mat[i] = t_sol
-
-        # update time
-        ctrl_t += sim_dt
-
-        # print progress
-        progress.update(task, advance=1, sim_time=i * sim_dt)
+    # update time
+    ctrl_t += sim_dt
 
 final_time = datetime.datetime.now()
 print(f"\nSimulation completed. [{final_time.strftime('%H:%M:%S')}]")
