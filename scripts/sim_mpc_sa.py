@@ -71,8 +71,8 @@ sim_settings.v_wind = 0.0  # wind speed [m/s]
 sim_settings.h_wind = 0.0  # wind direction [rad]
 sim_settings.v_curr = 0.0  # current speed [m/s]
 sim_settings.h_curr = 0.0  # current direction [rad]
-enable_measurement_noise: bool = False  # enable/disable measurement noise
-enable_actuation_noise: bool = False  # enable/disable actuation noise
+sim_settings.enable_measurement_noise = False  # enable/disable measurement noise
+sim_settings.enable_actuation_noise = False  # enable/disable actuation noise
 
 ########################################################################################
 
@@ -201,7 +201,7 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
     # update control input
     if ctrl_t == 0.0 or ctrl_t >= ctrl_dt:
 
-        if enable_measurement_noise is True:
+        if sim_settings.enable_measurement_noise is True:
             w_q = dist.measurement_noise()  # generate measurement noise
             q_meas = plant.q + w_q  # measure the state (with noise)
         else:
@@ -224,7 +224,7 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
 
         # actuation noise and clipping
         u = u_vec[:, 0]  # extract the first control input from the solution
-        if enable_actuation_noise is True:
+        if sim_settings.enable_actuation_noise is True:
             match sim_settings.usv_type:
                 case "seacat":
                     w_u = dist.actuation_noise_seacat()  # generate actuation noise

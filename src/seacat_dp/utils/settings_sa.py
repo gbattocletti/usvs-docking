@@ -58,6 +58,10 @@ class SimSettings:
         self.v_wind = 0.0  # Wind speed [m/s]
         self.h_wind = 0.0  # Wind direction [rad]
 
+        # Disturbances
+        self.enable_measurement_noise: bool = False  # enable/disable measurement noise
+        self.enable_actuation_noise: bool = False  # enable/disable actuation noise
+
         # USV
         self.usv_type = "seacat"  # USV model type: {"seacat", "seadragon"}
 
