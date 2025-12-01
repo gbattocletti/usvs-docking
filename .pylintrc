@@ -8,6 +8,8 @@ disable=
     missing-function-docstring, # C0116
     wrong-import-position, # C0413
     
+    redundant-keyword-arg, # E1124
+
     too-many-instance-attributes, # R0902
     too-few-public-methods, # R0903
     too-many-return-statements, # R0911

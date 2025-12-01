@@ -165,7 +165,7 @@ t_sol = 0.0
 # Initialize time series to store simulation data
 # NOTE: time increases along the column direction, i.e., q_mat[:, i] is q at time i*dt
 q_mat = np.zeros((12, sim_n + 1))
-q_mat[:, 0] = np.vstack((plant_sc.q, plant_sd.q))
+q_mat[:, 0] = np.hstack((plant_sc.q, plant_sd.q))
 q_ref_mat = np.zeros((12, sim_n))
 q_meas_mat = np.zeros((12, sim_n))
 u_mat = np.zeros((8, sim_n))
@@ -184,13 +184,12 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
         if sim_settings.enable_measurement_noise is True:
             w_q_sc = dist.measurement_noise()  # generate measurement noise for SC
             w_q_sd = dist.measurement_noise()  # generate measurement noise for SD
-            q_meas = np.vstack((plant_sc.q + w_q_sc, plant_sd.q + w_q_sd))
+            q_meas = np.hstack((plant_sc.q + w_q_sc, plant_sd.q + w_q_sd))
         else:
             w_q = np.zeros(12)
-            q_meas = np.vstack((plant_sc.q, plant_sd.q))
+            q_meas = np.hstack((plant_sc.q, plant_sd.q))
 
         # estimate disturbances
-        # TODO: implement disturbance estimator (currently uses exact measurement)
         b_curr_sc = hydrodynamics.crossflow_drag(plant_sc.q, params_sc, v_curr)
         b_wind_sc = wind_dynamics.wind_load(plant_sc.q, v_wind)
         b_curr_sd = hydrodynamics.crossflow_drag(plant_sd.q, params_sd, v_curr)
@@ -211,7 +210,7 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
         if sim_settings.enable_actuation_noise is True:
             w_u_sc = dist.actuation_noise_seacat()  # SeaCat actuation noise
             w_u_sd = dist.actuation_noise_seadragon()  # SeaDragon actuation noise
-            u = u + np.vstack((w_u_sc, w_u_sd))  # add actuation noise
+            u = u + np.hstack((w_u_sc, w_u_sd))  # add actuation noise
         else:
             w_u = np.zeros(8)  # only for logging purposes
         u = np.clip(u, sim_settings.u_min, sim_settings.u_max)  # enforce input bounds
@@ -222,7 +221,7 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
     plant_sd.step(u[4:], v_curr, v_wind)
 
     # store step data
-    q_mat[:, i + 1] = np.vstack((plant_sc.q, plant_sd.q))
+    q_mat[:, i + 1] = np.hstack((plant_sc.q, plant_sd.q))
     w_q_mat[:, i] = w_q
     w_u_mat[:, i] = w_u
     q_meas_mat[:, i] = q_meas
