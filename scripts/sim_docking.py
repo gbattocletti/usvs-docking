@@ -29,7 +29,7 @@ from seacat_dp.model import (
 )
 from seacat_dp.utils import io, settings_ma
 from seacat_dp.utils.wrappers import progress_sim
-from seacat_dp.visualization import animate, plot
+from seacat_dp.visualization import plot_ma
 
 # Load simulation settings
 sim_settings = settings_ma.SimSettings()
@@ -240,8 +240,28 @@ print(f"\nSimulation completed. [{final_time.strftime('%H:%M:%S')}]")
 # Generate filename to save data
 sim_name, _ = io.generate_filename()
 
+# Set show/save plot settings
+sim_settings.show_plots = True  # enable/disable plot showing
+sim_settings.save_plots = False  # enable/disable plot saving
+sim_settings.save_anim = False  # enable/disable animation saving
+
 # Save simulation data
-# TODO: update io to handle multi-agent simulations
+fig_variables, _ = plot_ma.plot_variables(
+    t_vec,
+    u_mat,
+    q_mat[:, :-1],
+    q_ref_mat,
+    cost_mat,
+)
+idx_list = list(np.linspace(0, sim_n, num=int(sim_n / 10000) + 1, dtype=int))
+fig_phase, _ = plot_ma.phase_plot(
+    q_mat[:, :-1],
+    v_curr,
+    v_wind,
+    # idx=idx_list,
+)
+
+plt.show(block=True)
 
 # Generate and save plots
 # TODO: update plot functions to handle multi-agent simulations
