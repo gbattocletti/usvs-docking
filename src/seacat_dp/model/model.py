@@ -144,56 +144,70 @@ class USVModel(ABC):
         return self.step(u, v_current, v_wind)
 
     def step(
-        self, u: np.ndarray, v_current: np.ndarray, v_wind: np.ndarray
+        self,
+        u: np.ndarray,
+        v_current: np.ndarray,
+        v_wind: np.ndarray,
+        use_thruster_dynamics: bool = False,
     ) -> np.ndarray:
         """
         Computes the next state of the model using the nonlinear dynamics.
 
         Args:
             u (np.ndarray): (4, ) control input vector.
-            where:
-                u[0] (float): force of the left stern (rear) thruster
-                u[1] (float): force of the right stern (rear) thruster
-                u[2] (float): force of the left bow thruster
-                u[3] (float): force of the right bow thruster
+                where:
+                    u[0] (float): force of the left stern (rear) thruster
+                    u[1] (float): force of the right stern (rear) thruster
+                    u[2] (float): force of the left bow thruster
+                    u[3] (float): force of the right bow thruster
 
             v_current (np.ndarray): (3, ) vector of the water current speed (measured or
                     estimated) acting on the boat [m/s]. The vector is expressed in the
                     inertial reference frame.
-            where:
-                v_current[0] (float): current speed along x axis
-                v_current[1] (float): current speed along y axis
-                v_current[2] (float): rotational speed around z axis (positive for CW)
+                where:
+                    v_current[0] (float): current speed along x axis
+                    v_current[1] (float): current speed along y axis
+                    v_current[2] (float): rotational speed around z axis (CW = positive)
 
             v_wind (np.ndarray): (3, ) vector of the wind speed (measured or estimated
                     disturbance) acting on the boat [m/s]. The vector is expressed in
                     the intertial reference frame.
-            where:
-                v_wind[0] (float): wind speed along x axis
-                v_wind[1] (float): wind speed along y axis
-                v_wind[2] (float): rotational speed around z axis (positive for CW)
+                where:
+                    v_wind[0] (float): wind speed along x axis
+                    v_wind[1] (float): wind speed along y axis
+                    v_wind[2] (float): rotational speed around z axis (positive for CW)
+
+            use_thruster_dynamics (bool): whether to use the thruster dynamics or not.
+                Default is False, meaning that the control input u is directly applied
+                to the USV dynamics.
 
         Returns:
             q_plus (np.ndarray): updated state vector q.
         """
 
         if self.integration_method == "euler":
+
             # thruster dynamics
-            self.u = self.u + self.thrusters_dynamics(self.u, u) * self.dt
+            if use_thruster_dynamics:
+                self.u = self.u + self.thrusters_dynamics(self.u, u) * self.dt
+                self.u = self.thrusters_saturation(self.u)
+            else:
+                self.u = self.thrusters_saturation(u)
 
             # USV dynamics
             self.q = self.q + self.dynamics(self.q, self.u, v_current, v_wind) * self.dt
 
         elif self.integration_method == "rk4":
             # thrusters dynamics
-            k1 = self.thrusters_dynamics(self.u, u)
-            k2 = self.thrusters_dynamics(self.u + k1 * self.dt / 2, u)
-            k3 = self.thrusters_dynamics(self.u + k2 * self.dt / 2, u)
-            k4 = self.thrusters_dynamics(self.u + k3 * self.dt, u)
-            self.u = self.u + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
-
-            # thrusters saturation
-            self.u = self.thrusters_saturation(self.u)
+            if use_thruster_dynamics:
+                k1 = self.thrusters_dynamics(self.u, u)
+                k2 = self.thrusters_dynamics(self.u + k1 * self.dt / 2, u)
+                k3 = self.thrusters_dynamics(self.u + k2 * self.dt / 2, u)
+                k4 = self.thrusters_dynamics(self.u + k3 * self.dt, u)
+                self.u = self.u + (k1 + 2 * k2 + 2 * k3 + k4) * self.dt / 6
+                self.u = self.thrusters_saturation(self.u)
+            else:
+                self.u = self.thrusters_saturation(u)
 
             # USV dynamics
             k1 = self.dynamics(self.q, self.u, v_current, v_wind)

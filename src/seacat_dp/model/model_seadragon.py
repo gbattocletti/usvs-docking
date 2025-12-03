@@ -52,7 +52,12 @@ class SeaDragonModel(USVModel):
         self.u = np.zeros(4)  # force vector [f_l, f_r, alpha_l, alpha_r]
 
     def dynamics(
-        self, q: np.ndarray, u: np.ndarray, v_current: np.ndarray, v_wind: np.ndarray
+        self,
+        q: np.ndarray,
+        u: np.ndarray,
+        v_current: np.ndarray,
+        v_wind: np.ndarray,
+        use_nonlinear_dynamics: bool = False,
     ) -> np.ndarray:
         """
         ODEs of the 2D nonlinear point-mass model of the SeaDragon.
@@ -70,13 +75,19 @@ class SeaDragonModel(USVModel):
             q_dot (np.ndarray): (6, ) time derivative of the state vector.
         """
         # Coriolis matrix update
-        self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (self.m_xg + self.Y_rdot) * q[5]
-        self.C[2, 1] = -(self.m + self.X_udot) * q[3]
-        self.C[0, 2] = -self.C[2, 0]
-        self.C[1, 2] = -self.C[2, 1]
+        if use_nonlinear_dynamics is True:
+            self.C[2, 0] = (self.m + self.Y_vdot) * q[4] + (
+                self.m_xg + self.Y_rdot
+            ) * q[5]
+            self.C[2, 1] = -(self.m + self.X_udot) * q[3]
+            self.C[0, 2] = -self.C[2, 0]
+            self.C[1, 2] = -self.C[2, 1]
 
-        # Nonlinear damping matrix update
-        self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate
+            # Nonlinear damping matrix update
+            self.D_NL[2, 2] = 10 * self.Nr * np.abs(q[5])  # Fossen NL damping estimate
+        else:
+            self.C[:, :] = 0.0
+            self.D_NL[:, :] = 0.0
         D = self.D_L + self.D_NL  # pack damping matrices in a single (3, 3) matrix
 
         # Compute the exogenous inputs in the local (body) reference frame

@@ -18,7 +18,7 @@ class SeaDragonParameters(Parameters):
         self.l_tot: float = 5.5
         self.b_tot: float = 2.1
         self.draft: float = 0.6  # placeholder value, TODO
-        self.xg: float = 0.0
+        self.xg: float = 0.1
         self.l_pontoon: float = self.l_tot
         self.b_pontoon: float = 0.4
         self.y_pontoon: float = 0.85
@@ -32,8 +32,8 @@ class SeaDragonParameters(Parameters):
         self.I_zz: float = 700.0  # placeholder value, TODO
 
         # Time constants
-        self.t_sway: float = 1.0
-        self.t_yaw: float = 1.0
+        self.t_sway: float = 2.0
+        self.t_yaw: float = 2.0
 
         # Thrusters geometric data
         self.l_thrusters: float = 1.52

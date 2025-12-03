@@ -90,11 +90,29 @@ class DockingMpc(Mpc):
         # Class-specific input constraints
         self.max_tot_u_sc: float | None = None  # Max total thrust for SeaCat
         self.max_tot_u_sd: float | None = None  # Max total thrust for seaDragon
-        self.use_mixed_integer_collision_avoidance: bool = False  # Non-collision type
-        self.target_distance: float = 1.9  # Target distance along x between the USVs
+        self.target_distance: float = 2.0  # Target distance along x between the USVs
+        self.safe_distance: float = 2.0  # Safe distance between the USVs
+
+        # Cost function weights
+        self.delta_1 = 1.0  # heading error weight
+        self.delta_2 = 1.0  # distance error weight
+        self.delta_3 = 1.0  # input cost weight
 
         # Flag to indicate whether q_ref is used in the OCP (different cost function)
         self.use_q_ref: bool = False
+
+    @staticmethod
+    def angle_wrap(a: float) -> float:
+        """
+        Helper function to avoid numerical issues in modulo arithmetic.
+
+        Args:
+            a (float): Angle in radians.
+
+        Returns:
+            float: Wrapped angle in radians within [-pi, pi].
+        """
+        return ca.atan2(ca.sin(a), ca.cos(a))
 
     def set_model(  # pylint: disable=arguments-differ
         self,
@@ -223,7 +241,7 @@ class DockingMpc(Mpc):
         # Output state derivative
         return ca.vertcat(dx[0:3], dv[0:3], dx[3:6], dv[3:6])
 
-    def _init_ocp(self, use_q_ref: bool = False):
+    def init_ocp(self, use_q_ref: bool = False):
         """
         Initialize centralized MPC optimization problem with the CasADi Opti framework.
 
@@ -234,6 +252,9 @@ class DockingMpc(Mpc):
                 offset equal to pi radians. The input heading is assigned to the SeaCat
                 by convention. Default is False.
         """
+        # Check if the OCP has already been initialized
+        if self.ocp_ready:
+            raise RuntimeError("The OCP has already been initialized.")
 
         # Initialize the OCP variables
         self.q = self.ocp.variable(self.n_q, self.N + 1)
@@ -316,15 +337,15 @@ class DockingMpc(Mpc):
                 )
 
         # Input rate constraints
-        if self.u_rate_min is not None and self.u_rate_max is not None:
-            for k in range(1, self.N):
-                self.ocp.subject_to(
-                    self.ocp.bounded(
-                        self.u_rate_min,
-                        self.u[:, k:] - self.u[:, k - 1],
-                        self.u_rate_max,
-                    )
-                )
+        # if self.u_rate_min is not None and self.u_rate_max is not None:
+        #     for k in range(1, self.N):
+        #         self.ocp.subject_to(
+        #             self.ocp.bounded(
+        #                 self.u_rate_min,
+        #                 self.u[:, k:] - self.u[:, k - 1],
+        #                 self.u_rate_max,
+        #             )
+        #         )
 
         # Maximum input constraint (1-norm constraint)
         # NOTE: this constraint is applied separately to the inputs of each USV, as each
@@ -348,94 +369,69 @@ class DockingMpc(Mpc):
                 )
 
         # Collision avoidance constraints between the two USVs
-        R_i2b = ca.vertcat(
-            ca.horzcat(ca.cos(self.q[2]), ca.sin(self.q[2])),
-            ca.horzcat(-ca.sin(self.q[2]), ca.cos(self.q[2])),
-        )  # rotation matrix from global to SeaCat body frame -- used also in cost func
-        # if self.use_mixed_integer_collision_avoidance is True:
-        #     raise NotImplementedError(
-        #         "Mixed-integer non-collision constraints are not implemented yet."
-        #     )
-        #     # TODO: implement mixed-integer non-collision constraints
-        # else:
-        #     # min distance along x in SeaCat body frame - assumes matching headings
-        #     for k in range(self.N):
-        #         xi = R_i2b @ ca.vertcat(
-        #             self.q[0, k] - self.q[6, k],
-        #             self.q[1, k] - self.q[7, k],
-        #         )  # relative position in SeaCat body frame
-        #         self.ocp.subject_to(xi[0] >= self.target_distance)
-
-        # State rate constraints
-        # if self.q_rate_min is not None and self.q_rate_max is not None:
-        #     for k in range(1, self.N + 1):
-        #         self.ocp.subject_to(
-        #             self.ocp.bounded(
-        #                 self.q_rate_min,
-        #                 self.q[:, k] - self.q[:, k - 1],
-        #                 self.q_rate_max,
-        #             )
-        #         )
+        for k in range(self.N):
+            self.ocp.subject_to(
+                ca.norm_2(
+                    ca.vertcat(
+                        self.q[0, k] - self.q[6, k],
+                        self.q[1, k] - self.q[7, k],
+                    )
+                )
+                >= self.safe_distance
+            )
 
         ## Cost function
         # State cost
         if use_q_ref is True:
-            # State cost - reference tracking
-            for k in range(self.N):
-                # Position error for SeaCat
-                self.cost_function += (
-                    self.q[0, k]
-                    - self.q_ref[0, k]
-                    + self.target_distance / (2 * np.cos(self.q_ref[2, k]))
-                ) ** 2 + (
-                    self.q[1, k]
-                    - self.q_ref[1, k]
-                    + self.target_distance / (2 * np.sin(self.q_ref[2, k]))
-                ) ** 2
-                # Heading error for SeaCat
-                self.cost_function += (
-                    ca.fmod((self.q[2, k] - self.q_ref[2, k] + np.pi), 2 * np.pi)
-                    - np.pi
-                ) ** 2
-                # Position error for SeaDragon
-                self.cost_function += (
-                    self.q[6, k]
-                    - self.q_ref[6, k]
-                    - +self.target_distance / (2 * np.cos(self.q_ref[2, k]))
-                ) ** 2 + (
-                    self.q[7, k]
-                    - self.q_ref[7, k]
-                    - self.target_distance / (2 * np.sin(self.q_ref[2, k]))
-                ) ** 2
-                # Heading error for SeaDragon (with pi offset)
-                self.cost_function += (
-                    (
-                        ca.fmod((self.q[8, k] - self.q_ref[8, k] + np.pi), 2 * np.pi)
-                        - np.pi
-                    )
-                    + np.pi
-                ) ** 2
+            # State cost - reference tracking (including terminal cost)
+            for k in range(self.N + 1):
+                err = self.q[:, k] - self.q_ref[:, k]
+                err[2] = self.angle_wrap(self.q[2, k] - self.q_ref[2, k])
+                err[8] = self.angle_wrap(self.q[8, k] - self.q_ref[8, k])
+                self.cost_function += err.T @ self.Q @ err
+
             self.use_q_ref = True  # flag to indicate that q_ref is used in the OCP
+
         else:
             # State cost - heading and distance matching
+            # for k in range(self.N):
+            #     self.cost_function += self.delta_1 * (
+            #         (self.angle_wrap(self.q[2, k] - self.q[8, k]) + np.pi) ** 2
+            #     )
+            # # rotation matrix from global to SeaCat body frame -- used also in cost func
+            # R_i2b = ca.vertcat(
+            #     ca.horzcat(ca.cos(self.q[2]), ca.sin(self.q[2])),
+            #     ca.horzcat(-ca.sin(self.q[2]), ca.cos(self.q[2])),
+            # )
+            # for k in range(self.N):
+            #     xi = R_i2b @ ca.vertcat(
+            #         self.q[0, k] - self.q[6, k],
+            #         self.q[1, k] - self.q[7, k],
+            #     )  # relative position in SeaCat body frame
+            #     self.cost_function += self.delta_2 * ((xi[0] - self.target_distance) ** 2 + ca.fabs(xi[1])**2)
+
+            # distance cost (alternative)
             for k in range(self.N):
-                self.cost_function += (
-                    ca.fmod((self.q[2, k] - self.q[8, k] + np.pi), 2 * np.pi) - np.pi
-                ) + np.pi
-            for k in range(self.N):
-                xi = R_i2b @ ca.vertcat(
-                    self.q[0, k] - self.q[6, k],
-                    self.q[1, k] - self.q[7, k],
-                )  # relative position in SeaCat body frame
-                self.cost_function += xi[0] - self.target_distance + ca.fabs(xi[1])
+                dist_xy = ca.norm_2(
+                    ca.vertcat(
+                        self.q[0, k] - self.q[6, k],
+                        self.q[1, k] - self.q[7, k],
+                    )
+                )
+                self.cost_function += self.delta_2 * dist_xy**2
 
         # Input cost
         for k in range(self.N):
-            self.cost_function += self.u[:, k].T @ self.R @ self.u[:, k]
+            self.cost_function += self.delta_3 * (
+                self.u[:, k].T @ self.R @ self.u[:, k]
+            )
 
         # Define the objective and set the solver options
         self.ocp.minimize(self.cost_function)
         self.ocp.solver(self.solver, self.ocp_options, self.solver_options)
+
+        # Flag ocp as initialized
+        self.ocp_ready = True  # Set flag to true
 
     def solve(  # pylint: disable=arguments-renamed, arguments-differ
         self,
@@ -551,6 +547,12 @@ class DockingMpc(Mpc):
         # Set the initial guess (warm start) if available
         if use_warm_start is True and self.sol is not None:
             self.ocp.set_initial(self.sol.value_variables())
+        elif self.sol is None:
+            # warm start on 1st solution to avoid numerical errors
+            # See: https://github.com/casadi/casadi/discussions/3539
+            # https://github.com/casadi/casadi/wiki/FAQ:-Why-am-I-getting-"NaN-detected"in-my-optimization%3F  # pylint: disable=line-too-long
+            for k in range(self.N + 1):
+                self.ocp.set_initial(self.q[:, k], q_0)
 
         # Solve the OCP problem
         self.sol = self.ocp.solve()
@@ -567,5 +569,109 @@ class DockingMpc(Mpc):
         # Return the solution
         return u, q, c, t
 
+    def cost(
+        self, stop_on_sanity_check: bool = False
+    ) -> tuple[float, float, float, float]:
+        """
+        Compute the cost function for the MPC problem. See super().cost() for more
+        details on this function and its outputs.
+
+        Args:
+            stop_on_sanity_check (bool): Whether to raise an error if the sanity check
+                fails. Default is False.
+
+        Returns:
+            - c_tot (float): The total cost of the MPC problem.
+            - c_state (float): The cost associated with the state trajectory.
+            - c_input (float): The cost associated with the control inputs.
+            - c_terminal (float): The terminal cost at the end of the horizon.
+
+        Raises:
+            RuntimeError: If the OCP is not ready or has not been solved yet.
+            ValueError: If the sum of the indivdual component of the cost does not match
+                the total cost returned by the MPC.
+        """
+        # Check if the OCP is ready and has been solved
+        if self.ocp_ready is False or self.sol is None:
+            raise RuntimeError("OCP is not ready or has not been solved yet.")
+
+        # Get the total cost
+        c_tot: float = self.sol.value(self.cost_function)
+
+        # Get the state and input variables
+        q = self.sol.value(self.q)
+        u = self.sol.value(self.u)
+
+        # Initialize cost terms
+        c_state_heading: float = 0.0
+        c_state_distance: float = 0.0
+        c_input: float = 0.0
+
+        # Compute cost terms (see _init_ocp for reference)
+        # c_state_heading = self.delta_1 * sum(
+        #     ((np.mod((q[2, k] - q[8, k] + np.pi), 2 * np.pi) - np.pi) + np.pi) ** 2
+        #     for k in range(self.N)
+        # )
+        # psi = q[2, 0]
+        # R_i2b = np.array(
+        #     [
+        #         [np.cos(psi), np.sin(psi)],
+        #         [-np.sin(psi), np.cos(psi)],
+        #     ]
+        # )
+        # for k in range(self.N):
+        #     xi = R_i2b @ np.array(
+        #         [
+        #             q[0, k] - q[6, k],
+        #             q[1, k] - q[7, k],
+        #         ]
+        #     )
+        #     c_state_distance += self.delta_2 * (xi[0] ** 2 + np.abs(xi[1]) ** 2)
+        for k in range(self.N):
+            dist_xy = np.linalg.norm(
+                np.array(
+                    [
+                        q[0, k] - q[6, k],
+                        q[1, k] - q[7, k],
+                    ]
+                )
+            )
+            c_state_distance += self.delta_2 * dist_xy**2
+
+        c_input = self.delta_3 * sum(
+            u[:, k].T @ self.R @ u[:, k] for k in range(self.N)
+        )
+
+        # Sanity check
+        if stop_on_sanity_check is True and not np.isclose(
+            c_tot, c_state_heading + c_state_distance + c_input, rtol=1e-4
+        ):
+            raise ValueError(
+                "Warning: Total cost does not match the sum of individual costs. "
+                f"\nTotal cost: {c_tot}"
+                f"\nState cost (heading): {c_state_heading}"
+                f"\nState cost (distance): {c_state_distance}"
+                f"\nInput cost: {c_input}"
+                f"\nSum: {c_state_heading + c_state_distance + c_input}.",
+            )
+
+        return c_tot, c_state_heading, c_state_distance, c_input
+
+    # Dummy methods to avoid errors due to mismatch with abstract methods of parent Mpc
+    def _solve(self):  # pylint: disable=arguments-differ
+        raise NotImplementedError(
+            "Method not implemented as the parent one (solve)"
+            "has been replaced with respect to the parent class."
+        )
+
+    def _set_model(self):  # pylint: disable=arguments-differ
+        raise NotImplementedError(
+            "Method not implemented as the parent one (set_model)"
+            "has been replaced with respect to the parent class."
+        )
+
     def _cost(self):
-        raise NotImplementedError("Cost sanity check not implemented yet.")
+        raise NotImplementedError(
+            "Method not implemented as the parent one (cost)"
+            "has been replaced with respect to the parent class."
+        )

@@ -127,13 +127,13 @@ class SimSettings:
             [
                 10e3,  # x position SeaCat
                 10e3,  # y position SeaCat
-                10e2,  # yaw (heading) SeaCat
+                10e3,  # yaw (heading) SeaCat
                 10e0,  # x velocity SeaCat
                 10e0,  # y velocity SeaCat
                 10e0,  # yaw rate SeaCat
                 10e3,  # x position SeaDragon
                 10e3,  # y position SeaDragon
-                10e2,  # yaw (heading) SeaDragon
+                10e3,  # yaw (heading) SeaDragon
                 10e0,  # x velocity SeaDragon
                 10e0,  # y velocity SeaDragon
                 10e0,  # yaw rate SeaDragon
@@ -143,10 +143,10 @@ class SimSettings:
             [
                 10e-2,  # stern left SeaCat
                 10e-2,  # stern right SeaCat
-                10e-1,  # bow left SeaCat
-                10e-1,  # bow right SeaCat
-                10e-1,  # stern left SeaDragon
-                10e-1,  # stern right SeaDragon
+                10e-2,  # bow left SeaCat
+                10e-2,  # bow right SeaCat
+                10e-2,  # stern left SeaDragon
+                10e-2,  # stern right SeaDragon
                 10e-3,  # angle left SeaDragon
                 10e-3,  # angle right SeaDragon
             ]

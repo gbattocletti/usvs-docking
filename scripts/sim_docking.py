@@ -35,14 +35,18 @@ from seacat_dp.visualization import plot_ma
 sim_settings = settings_ma.SimSettings()
 np.random.seed(sim_settings.seed)  # for reproducibility
 
+# Set debug mode
+DEBUG: bool = True
+
 ### MANUAL CUSTOMIZATION OF SIMULATION SETTINGS ########################################
 
 # Simulation duration [s]
-sim_settings.sim_t_end = 60.0
+sim_settings.sim_t_end = 90.0
 
 # Controller settings
-sim_settings.ctrl_N = 20  # Prediction horizon
+sim_settings.ctrl_N = 50  # Prediction horizon
 sim_settings.ctrl_dt = 0.5  # control time step [s]
+sim_settings.sim_dt = 0.5  # simulation time step [s]
 
 # Initial state (joint state (12, ) of SeaCat and SeaDragon)
 sim_settings.q_0 = np.array(
@@ -56,6 +60,23 @@ sim_settings.q_0 = np.array(
         10.0,  # x position SeaDragon [m]
         10.0,  # y position SeaDragon [m]
         0.0,  # yaw angle SeaDragon [rad]
+        0.0,  # x velocity SeaDragon [m/s]
+        0.0,  # y velocity SeaDragon [m/s]
+        0.0,  # yaw rate SeaDragon [rad/s]
+    ]
+)
+# q_ref = None # Uncomment to use cooperative docking
+q_ref = np.array(
+    [
+        5.6,  # x position SeaCat [m]
+        6.6,  # y position SeaCat [m]
+        np.pi / 4,  # yaw angle SeaCat [rad]
+        0.0,  # x velocity SeaCat [m/s]
+        0.0,  # y velocity SeaCat [m/s]
+        0.0,  # yaw rate SeaCat [rad/s]
+        4.0,  # x position SeaDragon [m]
+        5.0,  # y position SeaDragon [m]
+        -3 / 4 * np.pi,  # yaw angle SeaDragon [rad]
         0.0,  # x velocity SeaDragon [m/s]
         0.0,  # y velocity SeaDragon [m/s]
         0.0,  # yaw rate SeaDragon [rad/s]
@@ -88,12 +109,22 @@ for i, q in enumerate(sim_settings.q_0):
         q_0_str += f"{q:.2f}, "
 q_0_str += "]"
 print(
-    "=" * 53 + "\n"
-    "USV type: SeaCat + SeaDragon\n"
+    "\nUSV type: SeaCat + SeaDragon\n"
     f"(ctrl_dt: {sim_settings.ctrl_dt:.2f}, "
     f"ctrl_N: {sim_settings.ctrl_N})\n"
     f"Initial state:\t {q_0_str}\n"
 )
+
+# Print reference (if defined)
+if q_ref is not None:
+    q_ref_str = "["
+    for i, q in enumerate(q_ref):
+        if i == len(q_ref) - 1:
+            q_ref_str += f"{q:.2f}"
+        else:
+            q_ref_str += f"{q:.2f}, "
+    q_ref_str += "]"
+    print(f"Reference state:\t {q_ref_str}\n")
 
 # SETUP SIMULATION #####################################################################
 # Simulation parameters
@@ -151,7 +182,7 @@ mpc.set_model(plant_sc, plant_sd)
 mpc.set_weights(sim_settings.Q, sim_settings.R, sim_settings.P)
 mpc.set_input_bounds(sim_settings.u_min, sim_settings.u_max)
 mpc.set_input_rate_bounds(sim_settings.delta_u_min / 5, sim_settings.delta_u_max / 5)
-mpc.init_ocp()
+mpc.init_ocp(use_q_ref=True)
 
 # Initialize variables
 q_meas = np.zeros(12)  # joint measured state
@@ -202,6 +233,7 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
             b_wind_sc,
             b_curr_sd,
             b_wind_sd,
+            q_ref=q_ref,
             use_warm_start=True,
         )
 
@@ -215,6 +247,21 @@ for i in progress_sim(range(sim_n), dt=sim_dt):
             w_u = np.zeros(8)  # only for logging purposes
         u = np.clip(u, sim_settings.u_min, sim_settings.u_max)  # enforce input bounds
         ctrl_t = 0.0  # reset the elapsed time
+
+        # print debug info
+        if DEBUG is True:
+            c_tot, c_head, c_dist, c_inp = mpc.cost()
+            print(
+                f"Time: {i*sim_dt:.3f} s | "
+                f"Pos SC: ({plant_sc.q[0]:.2f}, {plant_sc.q[1]:.2f}, "
+                f"{plant_sc.q[2]:.2f}) | "
+                f"Pos SD: ({plant_sd.q[0]:.2f}, {plant_sd.q[1]:.2f}, "
+                f"{plant_sd.q[2]:.2f}) | "
+                f"Inputs: [{u[0]:.2f}, {u[1]:.2f}, {u[2]:.2f}, {u[3]:.2f}, "
+                f"{u[4]:.2f}, {u[5]:.2f}, {u[6]:.2f}, {u[7]:.2f}] | "
+                f"Cost: {cost:.2f} ({c_head:.2f}, {c_dist:.2f}, {c_inp:.2f}) | "
+                f"Sol. t: {t_sol:.2f} s"
+            )
 
     # perform one plant time step (with time step sim_dt < ctrl_dt)
     plant_sc.step(u[:4], v_curr, v_wind)
@@ -242,26 +289,33 @@ sim_name, _ = io.generate_filename()
 
 # Set show/save plot settings
 sim_settings.show_plots = True  # enable/disable plot showing
-sim_settings.save_plots = False  # enable/disable plot saving
-sim_settings.save_anim = False  # enable/disable animation saving
+sim_settings.save_plots = True  # enable/disable plot saving
 
-# Save simulation data
-fig_variables, _ = plot_ma.plot_variables(
-    t_vec,
-    u_mat,
-    q_mat[:, :-1],
-    q_ref_mat,
-    cost_mat,
-)
-idx_list = list(np.linspace(0, sim_n, num=int(sim_n / 10000) + 1, dtype=int))
-fig_phase, _ = plot_ma.phase_plot(
-    q_mat[:, :-1],
-    v_curr,
-    v_wind,
-    # idx=idx_list,
-)
+# Generate plots
+fig_variables = None  # Initialize to None to avoid errors
+fig_phase = None
 
-plt.show(block=True)
+if sim_settings.save_plots is True or sim_settings.show_plots is True:
+    fig_variables, _ = plot_ma.plot_variables(
+        t_vec,
+        u_mat,
+        q_mat[:, :-1],
+        q_ref_mat,
+        cost_mat,
+    )
+    idx_list = list(np.linspace(0, sim_n, num=int(sim_n / 10000) + 1, dtype=int))
+    fig_phase, _ = plot_ma.phase_plot(
+        q_mat[:, :-1],
+        v_curr,
+        v_wind,
+        # idx=idx_list,
+    )
 
-# Generate and save plots
-# TODO: update plot functions to handle multi-agent simulations
+# Save plots
+if sim_settings.save_plots is True:
+    io.save_figure(fig_variables, sim_name, "variables")
+    io.save_figure(fig_phase, sim_name, "phase-plot")
+
+# Show plots
+if sim_settings.show_plots is True:
+    plt.show(block=True)

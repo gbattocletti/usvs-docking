@@ -18,7 +18,7 @@ class SeaCatParameters(Parameters):
         self.l_tot: float = 5.7
         self.b_tot: float = 2
         self.draft: float = 0.83
-        self.xg: float = 0.0
+        self.xg: float = 0.1
         self.l_pontoon: float = self.l_tot
         self.b_pontoon: float = 0.65
         self.y_pontoon: float = 0.79
@@ -32,8 +32,8 @@ class SeaCatParameters(Parameters):
         self.I_zz: float = 2822.16
 
         # Time constants
-        self.t_sway: float = 1
-        self.t_yaw: float = 1
+        self.t_sway: float = 2
+        self.t_yaw: float = 2
 
         # Thrusters geometric data
         self.alpha: float = 15  # Bow thrusters angle from y axis [deg]
