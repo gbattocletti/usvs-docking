@@ -97,8 +97,10 @@ class SimSettings:
                 params_sc.max_bow_thrust_forward / params_sc.delay_bow * self.ctrl_dt,
                 params_sd.max_thrust / params_sd.delay_thrusters * self.ctrl_dt,
                 params_sd.max_thrust / params_sd.delay_thrusters * self.ctrl_dt,
-                params_sd.max_thrust_angular_speed * self.ctrl_dt,
-                params_sd.max_thrust_angular_speed * self.ctrl_dt,
+                # params_sd.max_thrust_angular_speed * self.ctrl_dt,
+                # params_sd.max_thrust_angular_speed * self.ctrl_dt,
+                0.5,
+                0.5,
             ]
         )  # [N] and [rad]
         self.delta_u_min: np.ndarray = np.array(
@@ -117,8 +119,10 @@ class SimSettings:
                 params_sd.max_thrust_backward
                 / params_sd.delay_thrusters
                 * self.ctrl_dt,
-                -params_sd.max_thrust_angular_speed * self.ctrl_dt,
-                -params_sd.max_thrust_angular_speed * self.ctrl_dt,
+                # -params_sd.max_thrust_angular_speed * self.ctrl_dt,
+                # -params_sd.max_thrust_angular_speed * self.ctrl_dt,
+                -0.5,
+                -0.5,
             ]
         )  # [N] and [rad]
 
@@ -143,12 +147,12 @@ class SimSettings:
             [
                 10e-2,  # stern left SeaCat
                 10e-2,  # stern right SeaCat
-                10e-2,  # bow left SeaCat
-                10e-2,  # bow right SeaCat
+                10e-3,  # bow left SeaCat
+                10e-3,  # bow right SeaCat
                 10e-2,  # stern left SeaDragon
                 10e-2,  # stern right SeaDragon
-                10e-3,  # angle left SeaDragon
-                10e-3,  # angle right SeaDragon
+                10e-4,  # angle left SeaDragon
+                10e-4,  # angle right SeaDragon
             ]
         )
         self.P: np.ndarray = self.Q  # Terminal cost

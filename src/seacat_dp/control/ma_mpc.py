@@ -39,8 +39,8 @@ class DockingMpc(Mpc):
             "max_wall_time": 60.0,  # Max solver time [s]
             "max_cpu_time": 60.0,  # Max CPU time [s]
             "print_level": 0,  # 0-5 (0 = silent, 5 = verbose)
-            "tol": 1e-6,  # Optimality tolerance
-            "acceptable_tol": 1e-4,  # Tolerance for early termination
+            "tol": 1e-4,  # Optimality tolerance
+            "acceptable_tol": 1e-2,  # Tolerance for early termination
             "linear_solver": "mumps",  # Recommended for most problems
         }
 
@@ -94,12 +94,12 @@ class DockingMpc(Mpc):
         self.safe_distance: float = 2.0  # Safe distance between the USVs
 
         # Cost function weights
-        self.delta_1 = 1.0  # heading error weight
-        self.delta_2 = 1.0  # distance error weight
+        self.delta_1 = 10.0  # heading error weight
+        self.delta_2 = 1000.0  # distance error weight
         self.delta_3 = 1.0  # input cost weight
 
         # Flag to indicate whether q_ref is used in the OCP (different cost function)
-        self.use_q_ref: bool = False
+        self.mode: str | None = None
 
     @staticmethod
     def angle_wrap(a: float) -> float:
@@ -241,16 +241,20 @@ class DockingMpc(Mpc):
         # Output state derivative
         return ca.vertcat(dx[0:3], dv[0:3], dx[3:6], dv[3:6])
 
-    def init_ocp(self, use_q_ref: bool = False):
+    def init_ocp(self, mode: str = "reference"):
         """
         Initialize centralized MPC optimization problem with the CasADi Opti framework.
 
         Args:
-            use_q_ref (bool): Whether to use a reference state trajectory in the OCP.
-                If True, the cost function is modified to make the two USVs converge
-                to a position close to q_ref (to avoid collisions) with an heading
-                offset equal to pi radians. The input heading is assigned to the SeaCat
-                by convention. Default is False.
+            mode (str): MPC operation mode. Options are:
+                - 'reference': reference tracking mode using q_ref parameter. Used for
+                    reference-based docking where the docking location is set
+                    externally (by some other layer of the algorithm).
+                - 'angle': docking mode with a prespecified docking heading.
+                - 'distance': docking mode using distance cost term. No q_ref.
+                - 'distance_heading': docking mode using distance and heading cost
+                    terms. No q_ref.
+
         """
         # Check if the OCP has already been initialized
         if self.ocp_ready:
@@ -262,14 +266,10 @@ class DockingMpc(Mpc):
 
         # Initialize the OCP parameters
         self.q_0 = self.ocp.parameter(self.n_q, 1)  # Initial state (n_q, 1)
-        self.q_ref = self.ocp.parameter(self.n_q, self.N + 1)  # Reference state seq.
         self.b_curr_sc = self.ocp.parameter(self.n_q // 4, 1)
         self.b_wind_sc = self.ocp.parameter(self.n_q // 4, 1)
         self.b_curr_sd = self.ocp.parameter(self.n_q // 4, 1)
         self.b_wind_sd = self.ocp.parameter(self.n_q // 4, 1)
-
-        # Cost function
-        self.cost_function = 0
 
         ## Constraints
         # Dynamics
@@ -337,15 +337,15 @@ class DockingMpc(Mpc):
                 )
 
         # Input rate constraints
-        # if self.u_rate_min is not None and self.u_rate_max is not None:
-        #     for k in range(1, self.N):
-        #         self.ocp.subject_to(
-        #             self.ocp.bounded(
-        #                 self.u_rate_min,
-        #                 self.u[:, k:] - self.u[:, k - 1],
-        #                 self.u_rate_max,
-        #             )
-        #         )
+        if self.u_rate_min is not None and self.u_rate_max is not None:
+            for k in range(1, self.N):
+                self.ocp.subject_to(
+                    self.ocp.bounded(
+                        self.u_rate_min,
+                        self.u[:, k:] - self.u[:, k - 1],
+                        self.u_rate_max,
+                    )
+                )
 
         # Maximum input constraint (1-norm constraint)
         # NOTE: this constraint is applied separately to the inputs of each USV, as each
@@ -381,44 +381,70 @@ class DockingMpc(Mpc):
             )
 
         ## Cost function
+        self.cost_function = 0
+
         # State cost
-        if use_q_ref is True:
-            # State cost - reference tracking (including terminal cost)
-            for k in range(self.N + 1):
-                err = self.q[:, k] - self.q_ref[:, k]
-                err[2] = self.angle_wrap(self.q[2, k] - self.q_ref[2, k])
-                err[8] = self.angle_wrap(self.q[8, k] - self.q_ref[8, k])
-                self.cost_function += err.T @ self.Q @ err
+        self.mode = mode  # store mode in memory for solve function
+        match mode:
+            case "reference":
+                # Initialize reference state sequence
+                self.q_ref = self.ocp.parameter(self.n_q, self.N + 1)
 
-            self.use_q_ref = True  # flag to indicate that q_ref is used in the OCP
+                # State cost - reference tracking (including terminal cost)
+                for k in range(self.N + 1):
+                    err = self.q[:, k] - self.q_ref[:, k]
+                    err[2] = self.angle_wrap(self.q[2, k] - self.q_ref[2, k])
+                    err[8] = self.angle_wrap(self.q[8, k] - self.q_ref[8, k])
+                    self.cost_function += err.T @ self.Q @ err
 
-        else:
-            # State cost - heading and distance matching
-            # for k in range(self.N):
-            #     self.cost_function += self.delta_1 * (
-            #         (self.angle_wrap(self.q[2, k] - self.q[8, k]) + np.pi) ** 2
-            #     )
-            # # rotation matrix from global to SeaCat body frame -- used also in cost func
-            # R_i2b = ca.vertcat(
-            #     ca.horzcat(ca.cos(self.q[2]), ca.sin(self.q[2])),
-            #     ca.horzcat(-ca.sin(self.q[2]), ca.cos(self.q[2])),
-            # )
-            # for k in range(self.N):
-            #     xi = R_i2b @ ca.vertcat(
-            #         self.q[0, k] - self.q[6, k],
-            #         self.q[1, k] - self.q[7, k],
-            #     )  # relative position in SeaCat body frame
-            #     self.cost_function += self.delta_2 * ((xi[0] - self.target_distance) ** 2 + ca.fabs(xi[1])**2)
+            case "angle":
+                # Initialize reference state sequence
+                self.q_ref = self.ocp.parameter(1, self.N + 1)
+                for k in range(self.N + 1):
+                    self.cost_function += (
+                        self.angle_wrap(self.q[2, k] - self.q_ref[2, k]) ** 2
+                        + self.angle_wrap(self.q[8, k] - self.q_ref[8, k]) ** 2
+                    )
 
-            # distance cost (alternative)
-            for k in range(self.N):
-                dist_xy = ca.norm_2(
-                    ca.vertcat(
+                for k in range(self.N):
+                    self.cost_function += self.delta_2 * (
+                        (self.q[0, k] - self.q[6, k]) ** 2
+                        + (self.q[1, k] - self.q[7, k]) ** 2
+                    )
+
+            case "distance":
+                # distance cost (alternative)
+                for k in range(self.N):
+                    self.cost_function += self.delta_2 * (
+                        (self.q[0, k] - self.q[6, k]) ** 2
+                        + (self.q[1, k] - self.q[7, k]) ** 2
+                    )
+
+            case "distance_heading":
+                # State cost - heading and distance matching
+                for k in range(self.N):
+                    self.cost_function += self.delta_1 * (
+                        (self.angle_wrap(self.q[2, k] - self.q[8, k]) + np.pi) ** 2
+                    )
+                # rotation matrix from global to SeaCat body frame -- used also in cost
+                R_i2b = ca.vertcat(
+                    ca.horzcat(ca.cos(self.q[2]), ca.sin(self.q[2])),
+                    ca.horzcat(-ca.sin(self.q[2]), ca.cos(self.q[2])),
+                )
+                for k in range(self.N):
+                    xi = R_i2b @ ca.vertcat(
                         self.q[0, k] - self.q[6, k],
                         self.q[1, k] - self.q[7, k],
+                    )  # relative position in SeaCat body frame
+                    self.cost_function += self.delta_2 * (
+                        (xi[0] - self.target_distance) ** 2 + ca.fabs(xi[1]) ** 2
                     )
+
+            case _:
+                raise ValueError(
+                    f"Invalid mode '{mode}'. Supported modes are 'reference', "
+                    "'free', 'angle', and 'distance'."
                 )
-                self.cost_function += self.delta_2 * dist_xy**2
 
         # Input cost
         for k in range(self.N):
@@ -440,7 +466,7 @@ class DockingMpc(Mpc):
         b_wind_sc: np.ndarray,
         b_curr_sd: np.ndarray,
         b_wind_sd: np.ndarray,
-        q_ref: np.ndarray | None = None,
+        q_ref: np.ndarray | float | None = None,
         use_warm_start: bool = True,
     ):
         """
@@ -481,22 +507,43 @@ class DockingMpc(Mpc):
         if q_0.shape != (self.n_q,):
             raise ValueError(f"q_0 must be of shape (n_q,), got {q_0.shape}")
         if q_ref is not None:
-            if q_ref.shape not in [(self.n_q,), (self.n_q, self.N + 1)]:
+            if self.mode == "angle":
+                if isinstance(q_ref, (float, int)):
+                    q_ref = float(q_ref)
+                    q_ref = np.array([[q_ref] * (self.N + 1)])  # (1, N+1)
+            elif self.mode == "reference":
+                if q_ref.shape not in [(self.n_q,), (self.n_q, self.N + 1)]:
+                    raise ValueError(
+                        "q_ref must be of shape (n_q,) or (n_q, N+1), "
+                        f"got {q_ref.shape}"
+                    )
+                if q_ref.shape == (self.n_q,):
+                    # cast from (n_q, ) to (n_q, N+1) to match OCP parameter shape
+                    q_ref = np.tile(q_ref[:, np.newaxis], (1, self.N + 1))
+                if any(q_ref[2, :] <= -np.pi) or any(q_ref[2, :] > np.pi):
+                    # NOTE: q_ref has now shape (n_q, N+1) so the whole row [2] is
+                    # checked to ensure that all angles are in the range (-pi, pi]
+                    print(
+                        f"{CmdColors.WARNING}[MA-NMPC]{CmdColors.ENDC}"
+                        "q_ref contains angles outside the range (-pi, pi]. "
+                        "The angles will be rebounded to this range."
+                    )
+                    q_ref[2, :] = (q_ref[2, :] + np.pi) % (2 * np.pi) - np.pi
+            else:
+                # q_ref provided but no use for it
                 raise ValueError(
-                    f"q_ref must be of shape (n_q,) or (n_q, N+1), got {q_ref.shape}"
+                    "The reference state trajectory q_ref was provided, but the OCP "
+                    "was not initialized to use it. Please re-initialize the OCP with "
+                    "use_q_ref=True."
                 )
-            if q_ref.shape == (self.n_q,):
-                # cast from (n_q, ) to (n_q, N+1) to match OCP parameter shape
-                q_ref = np.tile(q_ref[:, np.newaxis], (1, self.N + 1))
-            if any(q_ref[2, :] <= -np.pi) or any(q_ref[2, :] > np.pi):
-                # NOTE: q_ref has now shape (n_q, N+1) so the whole row [2] is checked
-                # to ensure that all angles are in the range (-pi, pi]
-                print(
-                    f"{CmdColors.WARNING}[MA-NMPC]{CmdColors.ENDC}"
-                    "q_ref contains angles outside the range (-pi, pi]. "
-                    "The angles will be rebounded to this range."
-                )
-                q_ref[2, :] = (q_ref[2, :] + np.pi) % (2 * np.pi) - np.pi
+        elif q_ref is None and self.mode in ["reference", "angle"]:
+            # q_ref required but not provided
+            raise ValueError(
+                "The OCP was initialized to use a reference state trajectory, but "
+                "q_ref was not provided. Please provide q_ref when calling solve()."
+            )
+
+        # Set exogenous inputs
         if b_curr_sc is None:
             b_curr_sc = np.zeros(3)
         elif b_curr_sc.shape != (3,):
@@ -523,20 +570,8 @@ class DockingMpc(Mpc):
         # Set the initial state
         self.ocp.set_value(self.q_0, q_0)
 
-        # Check input consistency and set the reference state trajectory
-        if q_ref is not None and self.use_q_ref is True:
-            self.ocp.set_value(self.q_ref, q_ref)
-        elif q_ref is not None and self.use_q_ref is False:
-            raise ValueError(
-                "The reference state trajectory q_ref was provided, but the OCP "
-                "was not initialized to use it. Please re-initialize the OCP with "
-                "use_q_ref=True."
-            )
-        elif q_ref is None and self.use_q_ref is True:
-            raise ValueError(
-                "The OCP was initialized to use a reference state trajectory, but "
-                "q_ref was not provided. Please provide q_ref when calling solve()."
-            )
+        # Set reference
+        self.ocp.set_value(self.q_ref, q_ref)
 
         # Set the disturbances
         self.ocp.set_value(self.b_curr_sc, b_curr_sc)  # (3, )
@@ -608,25 +643,12 @@ class DockingMpc(Mpc):
         c_input: float = 0.0
 
         # Compute cost terms (see _init_ocp for reference)
-        # c_state_heading = self.delta_1 * sum(
-        #     ((np.mod((q[2, k] - q[8, k] + np.pi), 2 * np.pi) - np.pi) + np.pi) ** 2
-        #     for k in range(self.N)
-        # )
-        # psi = q[2, 0]
-        # R_i2b = np.array(
-        #     [
-        #         [np.cos(psi), np.sin(psi)],
-        #         [-np.sin(psi), np.cos(psi)],
-        #     ]
-        # )
-        # for k in range(self.N):
-        #     xi = R_i2b @ np.array(
-        #         [
-        #             q[0, k] - q[6, k],
-        #             q[1, k] - q[7, k],
-        #         ]
-        #     )
-        #     c_state_distance += self.delta_2 * (xi[0] ** 2 + np.abs(xi[1]) ** 2)
+        # TODO: update cost computation to match actual terms of the cost function
+        # (needs to depend on MPC modes)
+        c_state_heading = self.delta_1 * sum(
+            ((np.mod((q[2, k] - q[8, k] + np.pi), 2 * np.pi) - np.pi) + np.pi) ** 2
+            for k in range(self.N)
+        )
         for k in range(self.N):
             dist_xy = np.linalg.norm(
                 np.array(
@@ -637,7 +659,6 @@ class DockingMpc(Mpc):
                 )
             )
             c_state_distance += self.delta_2 * dist_xy**2
-
         c_input = self.delta_3 * sum(
             u[:, k].T @ self.R @ u[:, k] for k in range(self.N)
         )

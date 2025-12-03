@@ -44,9 +44,9 @@ DEBUG: bool = True
 sim_settings.sim_t_end = 90.0
 
 # Controller settings
-sim_settings.ctrl_N = 50  # Prediction horizon
+sim_settings.ctrl_N = 20  # Prediction horizon
 sim_settings.ctrl_dt = 0.5  # control time step [s]
-sim_settings.sim_dt = 0.5  # simulation time step [s]
+sim_settings.sim_dt = 0.01  # simulation time step [s]
 
 # Initial state (joint state (12, ) of SeaCat and SeaDragon)
 sim_settings.q_0 = np.array(
@@ -65,23 +65,34 @@ sim_settings.q_0 = np.array(
         0.0,  # yaw rate SeaDragon [rad/s]
     ]
 )
-# q_ref = None # Uncomment to use cooperative docking
-q_ref = np.array(
-    [
-        5.6,  # x position SeaCat [m]
-        6.6,  # y position SeaCat [m]
-        np.pi / 4,  # yaw angle SeaCat [rad]
-        0.0,  # x velocity SeaCat [m/s]
-        0.0,  # y velocity SeaCat [m/s]
-        0.0,  # yaw rate SeaCat [rad/s]
-        4.0,  # x position SeaDragon [m]
-        5.0,  # y position SeaDragon [m]
-        -3 / 4 * np.pi,  # yaw angle SeaDragon [rad]
-        0.0,  # x velocity SeaDragon [m/s]
-        0.0,  # y velocity SeaDragon [m/s]
-        0.0,  # yaw rate SeaDragon [rad/s]
-    ]
-)
+
+# Selection of docking mode. Options are {reference, distance, angle, distance_heading}.
+# Reference requires a (12, ) reference vector, and angle requires a heading angle.
+# See init_ocp() documentation for details.
+mode = "reference"
+match mode:
+    case ["distance", "distance_heading"]:
+        q_ref = None  # No reference state needed
+    case "angle":
+        q_ref = np.pi / 4  # docking heading [rad]
+    case "reference":
+        q_ref = np.array(
+            [
+                5.6,  # x position SeaCat [m]
+                6.6,  # y position SeaCat [m]
+                np.pi / 4,  # yaw angle SeaCat [rad]
+                0.0,  # x velocity SeaCat [m/s]
+                0.0,  # y velocity SeaCat [m/s]
+                0.0,  # yaw rate SeaCat [rad/s]
+                4.0,  # x position SeaDragon [m]
+                5.0,  # y position SeaDragon [m]
+                -3 / 4 * np.pi,  # yaw angle SeaDragon [rad]
+                0.0,  # x velocity SeaDragon [m/s]
+                0.0,  # y velocity SeaDragon [m/s]
+                0.0,  # yaw rate SeaDragon [rad/s]
+            ]
+        )
+
 
 # Exogenous disturbances
 sim_settings.v_wind = 0.0  # wind speed [m/s]
@@ -182,7 +193,7 @@ mpc.set_model(plant_sc, plant_sd)
 mpc.set_weights(sim_settings.Q, sim_settings.R, sim_settings.P)
 mpc.set_input_bounds(sim_settings.u_min, sim_settings.u_max)
 mpc.set_input_rate_bounds(sim_settings.delta_u_min / 5, sim_settings.delta_u_max / 5)
-mpc.init_ocp(use_q_ref=True)
+mpc.init_ocp(mode=mode)
 
 # Initialize variables
 q_meas = np.zeros(12)  # joint measured state
