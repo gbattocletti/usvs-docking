@@ -52,3 +52,16 @@ def R_i2b(theta: float) -> np.ndarray:
         ]
     )
     return R
+
+
+def angle_wrap(a: float) -> float:
+    """
+    Helper function to avoid numerical issues in modulo arithmetic.
+
+    Args:
+        a (float): Angle in radians.
+
+    Returns:
+        float: Wrapped angle in radians within [-pi, pi].
+    """
+    return np.atan2(np.sin(a), np.cos(a))

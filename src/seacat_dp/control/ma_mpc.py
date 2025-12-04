@@ -36,11 +36,11 @@ class DockingMpc(Mpc):
         self.solver = "ipopt"
         self.solver_options: dict = {
             "max_iter": 10_000,
-            "max_wall_time": 60.0,  # Max solver time [s]
+            "max_wall_time": 120.0,  # Max solver time [s]
             "max_cpu_time": 60.0,  # Max CPU time [s]
             "print_level": 0,  # 0-5 (0 = silent, 5 = verbose)
-            "tol": 1e-4,  # Optimality tolerance
-            "acceptable_tol": 1e-2,  # Tolerance for early termination
+            "tol": 1e-6,  # Optimality tolerance
+            "acceptable_tol": 1e-4,  # Tolerance for early termination
             "linear_solver": "mumps",  # Recommended for most problems
         }
 
@@ -90,11 +90,11 @@ class DockingMpc(Mpc):
         # Class-specific input constraints
         self.max_tot_u_sc: float | None = None  # Max total thrust for SeaCat
         self.max_tot_u_sd: float | None = None  # Max total thrust for seaDragon
-        self.target_distance: float = 2.0  # Target distance along x between the USVs
+        self.target_distance: float = 2.5  # Target distance along x between the USVs
         self.safe_distance: float = 2.0  # Safe distance between the USVs
 
         # Cost function weights
-        self.delta_1 = 10.0  # heading error weight
+        self.delta_1 = 1000.0  # heading error weight
         self.delta_2 = 1000.0  # distance error weight
         self.delta_3 = 1.0  # input cost weight
 
@@ -337,47 +337,45 @@ class DockingMpc(Mpc):
                 )
 
         # Input rate constraints
-        if self.u_rate_min is not None and self.u_rate_max is not None:
-            for k in range(1, self.N):
-                self.ocp.subject_to(
-                    self.ocp.bounded(
-                        self.u_rate_min,
-                        self.u[:, k:] - self.u[:, k - 1],
-                        self.u_rate_max,
-                    )
-                )
+        # if self.u_rate_min is not None and self.u_rate_max is not None:
+        #     for k in range(1, self.N):
+        #         self.ocp.subject_to(
+        #             self.ocp.bounded(
+        #                 self.u_rate_min,
+        #                 self.u[:, k:] - self.u[:, k - 1],
+        #                 self.u_rate_max,
+        #             )
+        #         )
 
         # Maximum input constraint (1-norm constraint)
         # NOTE: this constraint is applied separately to the inputs of each USV, as each
         # of them has its own maximum total thrust capability (power budget). For the
         # SeaDragon, the power consumption is computed only for the thrust force and not
         # for the azimuth angle.
-        if self.max_tot_u is not None:
-            for k in range(self.N):
-                self.ocp.subject_to(ca.norm_1(self.u[0:4, k]) <= self.max_tot_u_sc)
-                self.ocp.subject_to(ca.norm_1(self.u[4:6, k]) <= self.max_tot_u_sd)
+        # if self.max_tot_u is not None:
+        #     for k in range(self.N):
+        #         self.ocp.subject_to(ca.norm_1(self.u[0:4, k]) <= self.max_tot_u_sc)
+        #         self.ocp.subject_to(ca.norm_1(self.u[4:6, k]) <= self.max_tot_u_sd)
 
-        # State constraints
-        if self.q_min is not None or self.q_max is not None:
-            for k in range(self.N + 1):
-                self.ocp.subject_to(
-                    self.ocp.bounded(
-                        self.q_min,
-                        self.q[:, k],
-                        self.q_max,
-                    )
-                )
+        # # State constraints
+        # if self.q_min is not None or self.q_max is not None:
+        #     for k in range(self.N + 1):
+        #         self.ocp.subject_to(
+        #             self.ocp.bounded(
+        #                 self.q_min,
+        #                 self.q[:, k],
+        #                 self.q_max,
+        #             )
+        #         )
 
         # Collision avoidance constraints between the two USVs
         for k in range(self.N):
             self.ocp.subject_to(
-                ca.norm_2(
-                    ca.vertcat(
-                        self.q[0, k] - self.q[6, k],
-                        self.q[1, k] - self.q[7, k],
-                    )
+                (
+                    (self.q[0, k] - self.q[6, k]) ** 2
+                    + (self.q[1, k] - self.q[7, k]) ** 2
                 )
-                >= self.safe_distance
+                >= self.safe_distance**2
             )
 
         ## Cost function
@@ -396,6 +394,16 @@ class DockingMpc(Mpc):
                     err[2] = self.angle_wrap(self.q[2, k] - self.q_ref[2, k])
                     err[8] = self.angle_wrap(self.q[8, k] - self.q_ref[8, k])
                     self.cost_function += err.T @ self.Q @ err
+
+                for k in range(self.N):
+                    self.cost_function += 1000 * (
+                        1
+                        / (
+                            (self.q[0, k] - self.q[6, k]) ** 2
+                            + (self.q[1, k] - self.q[7, k]) ** 2
+                        )
+                        - self.target_distance**2
+                    )
 
             case "angle":
                 # Initialize reference state sequence
