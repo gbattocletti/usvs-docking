@@ -144,6 +144,12 @@ sim_name, _ = io.generate_filename()
 # RUN ALL EVALUATIONS ##################################################################
 for eval_name in eval_list:
 
+    # Reset initial conditions in the plant
+    plant_sc.set_initial_conditions(sim_settings.q_0[0:6])
+    plant_sd.set_initial_conditions(sim_settings.q_0[6:12])
+    plant_sc.u = np.zeros(4)
+    plant_sd.u = np.zeros(4)
+
     # Reset variables
     q_meas = np.zeros(12)  # joint measured state
     q_pred = np.zeros((12, mpc.N + 1))  # joint predicted state (MPC solution)
@@ -168,12 +174,6 @@ for eval_name in eval_list:
     w_u_mat = np.zeros((8, sim_n))
     cost_mat = np.zeros(sim_n)
     sol_t_mat = np.zeros(sim_n)
-
-    # Reset initial conditions in the plant
-    plant_sc.set_initial_conditions(sim_settings.q_0[0:6])
-    plant_sd.set_initial_conditions(sim_settings.q_0[6:12])
-    plant_sc.u = np.zeros(4)
-    plant_sd.u = np.zeros(4)
 
     # Select reference depending on evaluation type
     match eval_name:
@@ -340,19 +340,6 @@ for eval_name in eval_list:
 
         # update time
         ctrl_t += sim_dt
-
-    # TEMP trim first and last data points
-    # There is a bug in the script that causes either the first or last data point to be
-    # copied from the previous experiment, which messes up the plots. I am removing it
-    # manually, since the time step is small enough for this not to affect the results.
-    # I will hopefully fix this properly at some point.
-    q_mat = q_mat[1:-1]
-    w_q_mat = w_q_mat[:, 1:-1]
-    w_u_mat = w_u_mat[:, 1:-1]
-    q_meas_mat = q_meas_mat[:, 1:-1]
-    u_mat = u_mat[:, 1:-1]
-    cost_mat = cost_mat[1:-1]
-    sol_t_mat = sol_t_mat[1:-1]
 
     final_time = datetime.datetime.now()
     print(
