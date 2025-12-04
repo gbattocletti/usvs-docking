@@ -40,11 +40,11 @@ os.chdir(script_dir)
 
 # Load simulation settings
 sim_settings = settings_ma.SimSettings()
-np.random.seed(2)  # for reproducibility
+np.random.seed(1)  # for reproducibility
 
 # SIMULATION SETTINGS ##################################################################
 # Simulation duration [s]
-sim_settings.sim_t_end = 240.0
+sim_settings.sim_t_end = 180.0
 
 # Controller settings
 sim_settings.ctrl_N = 50  # Prediction horizon
@@ -54,15 +54,15 @@ sim_settings.sim_dt = 0.5  # simulation time step [s]
 # Initial state (joint state (12, ) of SeaCat and SeaDragon)
 sim_settings.q_0 = np.array(
     [
-        0.0,  # x position SeaCat [m]
-        0.0,  # y position SeaCat [m]
-        np.pi / 4,  # yaw angle SeaCat [rad]
+        -2.0,  # x position SeaCat [m]
+        1.0,  # y position SeaCat [m]
+        -np.pi / 6,  # yaw angle SeaCat [rad]
         0.0,  # x velocity SeaCat [m/s]
         0.0,  # y velocity SeaCat [m/s]
         0.0,  # yaw rate SeaCat [rad/s]
         10.0,  # x position SeaDragon [m]
-        -5.0,  # y position SeaDragon [m]
-        -np.pi / 2,  # yaw angle SeaDragon [rad]
+        10.0,  # y position SeaDragon [m]
+        np.pi / 4,  # yaw angle SeaDragon [rad]
         0.0,  # x velocity SeaDragon [m/s]
         0.0,  # y velocity SeaDragon [m/s]
         0.0,  # yaw rate SeaDragon [rad/s]
@@ -71,9 +71,9 @@ sim_settings.q_0 = np.array(
 
 # List of evaluations to perform
 eval_list = [
-    "static_usv",
-    "cooperative",
-    "cooperative_no_estimation",
+    # "static_usv",
+    # "cooperative",
+    # "cooperative_no_estimation",
     "cooperative_wrong_heading",
 ]
 
@@ -107,8 +107,8 @@ plant_sd.set_integration_method("rk4")
 plant_sd.set_initial_conditions(sim_settings.q_0[6:12])
 
 # Initialize exogenous inputs
-sim_settings.v_curr = 0.15  # current speed [m/s]
-sim_settings.h_curr = np.pi / 3  # current direction [rad]
+sim_settings.v_curr = 0.1  # current speed [m/s]
+sim_settings.h_curr = 0.0  # current direction [rad]
 dist = disturbances.Disturbances()
 dist.set_current_direction(sim_settings.h_curr)  # [rad]
 dist.set_current_speed(sim_settings.v_curr)  # [m/s]
@@ -138,11 +138,11 @@ mpc.init_ocp(mode="reference")
 pos_thresh = 0.5
 angle_thresh = np.deg2rad(10)
 
-# Generate filename to save data
-sim_name, _ = io.generate_filename()
-
 # RUN ALL EVALUATIONS ##################################################################
 for eval_name in eval_list:
+
+    # Generate filename to save data
+    sim_name, _ = io.generate_filename()
 
     # Reset initial conditions in the plant
     plant_sc.set_initial_conditions(sim_settings.q_0[0:6])
@@ -180,15 +180,15 @@ for eval_name in eval_list:
         case "static_usv":
             q_ref = np.array(
                 [
-                    0.0,  # x position SeaCat [m]
-                    0.0,  # y position SeaCat [m]
-                    0.0,  # yaw angle SeaCat [rad]
+                    -2.0,  # x position SeaCat [m]
+                    1.0,  # y position SeaCat [m]
+                    -np.pi / 6,  # yaw angle SeaCat [rad]
                     0.0,  # x velocity SeaCat [m/s]
                     0.0,  # y velocity SeaCat [m/s]
                     0.0,  # yaw rate SeaCat [rad/s]
-                    0.0,  # x position SeaDragon [m]
-                    -2.2,  # y position SeaDragon [m]
-                    -np.pi,  # yaw angle SeaDragon [rad]
+                    -3.9,  # x position SeaDragon [m]
+                    2.1,  # y position SeaDragon [m]
+                    5 / 6 * np.pi,  # yaw angle SeaDragon [rad]
                     0.0,  # x velocity SeaDragon [m/s]
                     0.0,  # y velocity SeaDragon [m/s]
                     0.0,  # yaw rate SeaDragon [rad/s]
@@ -197,15 +197,15 @@ for eval_name in eval_list:
         case "cooperative" | "cooperative_no_estimation":
             q_ref = np.array(
                 [
-                    5.6,  # x position SeaCat [m]
-                    6.6,  # y position SeaCat [m]
-                    np.pi / 4,  # yaw angle SeaCat [rad]
+                    6.2,  # x position SeaCat [m]
+                    5.0,  # y position SeaCat [m]
+                    0.0,  # yaw angle SeaCat [rad]
                     0.0,  # x velocity SeaCat [m/s]
                     0.0,  # y velocity SeaCat [m/s]
                     0.0,  # yaw rate SeaCat [rad/s]
                     4.0,  # x position SeaDragon [m]
                     5.0,  # y position SeaDragon [m]
-                    -3 / 4 * np.pi,  # yaw angle SeaDragon [rad]
+                    -np.pi,  # yaw angle SeaDragon [rad]
                     0.0,  # x velocity SeaDragon [m/s]
                     0.0,  # y velocity SeaDragon [m/s]
                     0.0,  # yaw rate SeaDragon [rad/s]
@@ -214,14 +214,14 @@ for eval_name in eval_list:
         case "cooperative_wrong_heading":
             q_ref = np.array(
                 [
-                    5.6,  # x position SeaCat [m]
-                    6.6,  # y position SeaCat [m]
+                    5.5,  # x position SeaCat [m]
+                    6.5,  # y position SeaCat [m]
                     np.pi / 2,  # yaw angle SeaCat [rad]
                     0.0,  # x velocity SeaCat [m/s]
                     0.0,  # y velocity SeaCat [m/s]
                     0.0,  # yaw rate SeaCat [rad/s]
-                    4.0,  # x position SeaDragon [m]
-                    5.0,  # y position SeaDragon [m]
+                    5.5,  # x position SeaDragon [m]
+                    4.2,  # y position SeaDragon [m]
                     -np.pi / 2,  # yaw angle SeaDragon [rad]
                     0.0,  # x velocity SeaDragon [m/s]
                     0.0,  # y velocity SeaDragon [m/s]
@@ -361,7 +361,7 @@ for eval_name in eval_list:
     # Save simulation data
     # NOTE: the SeaCat data are used where only one USV is allowed
     io.save_sim_data(
-        sim_name + eval_name,
+        sim_name,
         params_sc,
         sim_settings,
         plant_sc,
@@ -394,7 +394,7 @@ for eval_name in eval_list:
         q_mat[:, :-1],
         v_curr,
         v_wind,
-        # idx=list(np.linspace(0, sim_n, num=int(sim_n / 10000) + 1, dtype=int)),
+        idx=[0, -1],
     )
 
     # Save plots
