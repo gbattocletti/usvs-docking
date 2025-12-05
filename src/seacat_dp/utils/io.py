@@ -257,7 +257,7 @@ def save_figure(fig: plt.Figure, sim_name: str, name: str) -> None:
         sim_name = sim_name.replace(".png", "")
 
     # Create filename
-    filename = f"results\\{sim_name}\\{sim_name}-{name}.png"
+    filename = f"{sim_name}-{name}.png"
 
     # Save figure
     print(f"Saving figure {name}...")

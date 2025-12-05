@@ -3,92 +3,76 @@ Generates the plots from a previously generated .pkl file.
 """
 
 import os
-import sys
+import pickle
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import numpy as np
 
-from seacat_dp.utils import io
-from seacat_dp.visualization import animate, plot
-
-# select data to visualize
-filename = None  # manually select a file
-# filename = "2025-06-05-0007.pkl"
-
-# visualization options
-SHOW_PLOTS = False
-SAVE_PLOTS = True
-SAVE_ANIM = False
+from seacat_dp.utils import io, transformations
+from seacat_dp.visualization import plot_ma
 
 # move to the directory of the script
 script_dir = Path(__file__).parent
 os.chdir(script_dir)
 
-# manually select a file
-if filename is None:
-    filename = io.select_file_interactively()
-    if not filename:  # User canceled the dialog
-        print("No file selected. Exiting.")
-        sys.exit(0)
-elif not filename.endswith(".pkl"):
-    filename += ".pkl"
+# select data to visualize
+filename = "results/experiment-4/cooperative-no-b-data.pkl"
 
 # load the simulation data
-data = io.load_sim_data(filename)
+with open(filename, "rb") as f:
+    data = pickle.load(f)
 
 # unpack the data
-t_vec = data["t_vec"]
-q_ref_mat = data["q_ref_mat"]
 q_mat = data["q_mat"]
-q_mat = q_mat[:, :-1]  # remove the last column (future state)
-q_mat_measured = data["q_mat_measured"]
-w_q_mat = data["w_q_mat"]
+q_mat = q_mat[:, :-1]
+q_ref_mat = data["q_ref_mat"]
+q_ref_mat = q_ref_mat[:, :-1]
 u_mat = data["u_control_mat"]
-w_u_mat = data["w_q_mat"]
 v_current = data["v_current"]
 v_wind = data["v_wind"]
-b_current = data["b_current"]
-b_wind = data["b_wind"]
-cost_mat = data["cost_mat"]
-
-# plot parameters
-anim_speed_up_factor = 200  # speed up factor for the animation
 
 # generate the plots and animation
-if not SHOW_PLOTS and not SAVE_PLOTS and not SAVE_ANIM:
-    print("No plots or animations will be generated. Exiting.")
-    sys.exit(0)
+fig_phase, _ = plot_ma.phase_plot(q_mat, v_current, v_wind, idx=[0, -1])
+io.save_figure(fig_phase, "results/figure", "phase-plot")
 
-fig_variables, _ = plot.plot_variables(t_vec, u_mat, q_mat, q_ref_mat, cost_mat)
-# plt.gcf().set_size_inches(6, 6)
-fig_variables.set_figheight(4)
-fig_variables.set_figwidth(4)
-# plt.tight_layout()
-
-fig_phase, _ = plot.phase_plot(q_mat, v_current, v_wind)
-# plt.gcf().set_size_inches(6, 6)
-fig_phase.set_figheight(4)
-fig_phase.set_figwidth(4)
-# plt.tight_layout()
-
-anim = animate.generate_animation(
-    t_vec,
-    q_mat,
-    q_ref_mat,
-    u_mat,
-    v_current,
-    v_wind,
-    anim_speed_up_factor,
+# Print evaluation metrics
+Q: np.ndarray = np.diag(
+    [
+        10e3,  # x position SeaCat
+        10e3,  # y position SeaCat
+        10e3,  # yaw (heading) SeaCat
+        10e0,  # x velocity SeaCat
+        10e0,  # y velocity SeaCat
+        10e0,  # yaw rate SeaCat
+        10e3,  # x position SeaDragon
+        10e3,  # y position SeaDragon
+        10e3,  # yaw (heading) SeaDragon
+        10e0,  # x velocity SeaDragon
+        10e0,  # y velocity SeaDragon
+        10e0,  # yaw rate SeaDragon
+    ]
 )
-
-if SAVE_PLOTS:
-    plt.tight_layout()
-
-    io.save_figure(fig_variables, filename, "variables")
-    io.save_figure(fig_phase, filename, "phase-plot")
-
-if SAVE_ANIM:
-    io.save_animation(anim, filename)
-
-if SHOW_PLOTS:
-    plt.show()
+R: np.ndarray = np.diag(
+    [
+        10e-2,  # stern left SeaCat
+        10e-2,  # stern right SeaCat
+        10e-3,  # bow left SeaCat
+        10e-3,  # bow right SeaCat
+        10e-2,  # stern left SeaDragon
+        10e-2,  # stern right SeaDragon
+        10e-4,  # angle left SeaDragon
+        10e-4,  # angle right SeaDragon
+    ]
+)
+cost_eval = 0.0
+for i in range(q_mat.shape[1] - 1):
+    joint_err = q_mat[:, i] - q_ref_mat[:, i]
+    joint_err[2] = transformations.angle_wrap(joint_err[2])  # SC yaw error
+    joint_err[8] = transformations.angle_wrap(joint_err[8])  # SD yaw error
+    joint_u = u_mat[:, i]
+    cost_eval += joint_err.T @ Q @ joint_err + joint_u.T @ R @ joint_u
+len_sc = np.sum(np.sqrt(np.diff(q_mat[0, :]) ** 2 + np.diff(q_mat[1, :]) ** 2))
+len_sd = np.sum(np.sqrt(np.diff(q_mat[6, :]) ** 2 + np.diff(q_mat[7, :]) ** 2))
+print(f"Cumulative evaluation cost: {cost_eval:.2f}")
+print(f"Distance traveled by SeaCat: {len_sc:.2f}")
+print(f"Distance traveled by SeaDragon: {len_sd:.2f}")

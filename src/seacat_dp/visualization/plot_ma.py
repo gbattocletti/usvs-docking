@@ -1,17 +1,31 @@
 import warnings
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 
 from seacat_dp.utils.transformations import R_i2b
 
-plt.rcParams["text.usetex"] = True
+labels_font_size = 6
+tick_labels_font_size = 6
+mpl.rcParams.update(
+    {
+        "pgf.texsystem": "xelatex",  # or any other engine you want to use
+        "text.usetex": True,  # use TeX for all texts
+        "font.family": "serif",
+        "font.size": labels_font_size,
+        "axes.labelsize": labels_font_size,
+        "legend.fontsize": labels_font_size,
+        "xtick.labelsize": tick_labels_font_size,
+        "ytick.labelsize": tick_labels_font_size,
+        "pgf.rcfonts": False,
+        "pgf.preamble": "\\usepackage[T1]{fontenc}",  # extra preamble for LaTeX
+    }
+)
 
-""" 
-Useful links:
-- Matplotlib RF plot https://thomascountz.com/2018/11/18/2d-coordinate-fromes-matplotlib
-"""
+# Useful links:
+# - Matplotlib RF plot https://thomascountz.com/2018/11/18/2d-coordinate-fromes-matplotlib
 
 
 def plot_variables(
@@ -202,11 +216,13 @@ def initialize_phase_plot(
         ax (Axes): Axes object.
     """
     # Initialize figure
-    fig, ax = plt.subplots()  # possible option: figsize=(6, 6)
+    size_x = 4.5  # cm
+    size_y = 4.5  # cm
+    fig, ax = plt.subplots(figsize=(size_x / 2.54, size_y / 2.54))
     ax.set_aspect("equal", "box")
     plt.xlim(x_min, x_max)  # Set x-axis range
     plt.ylim(y_min, y_max)  # Set y-axis range
-    ax.set(xlabel="y earth [m]", ylabel="x earth [m]")
+    # ax.set(xlabel="y earth [m]", ylabel="x earth [m]")
 
     # Return figure and axes
     return fig, ax
@@ -240,42 +256,55 @@ def phase_plot(
         idx = [-1]
 
     # Compute bounds:
-    x_min = np.min([np.min(q_mat[1, :]), np.min(q_mat[7, :])]) - 1
-    x_max = np.max([np.max(q_mat[1, :]), np.max(q_mat[7, :])]) + 1
-    y_min = np.min([np.min(q_mat[0, :]), np.min(q_mat[6, :])]) - 1
-    y_max = np.max([np.max(q_mat[0, :]), np.max(q_mat[6, :])]) + 1
-    # x_min = -1.6
-    # x_max = 1.1
-    # y_min = -1.1
-    # y_max = 1.6
+    # x_min = np.min([np.min(q_mat[1, :]), np.min(q_mat[7, :])]) - 1
+    # x_max = np.max([np.max(q_mat[1, :]), np.max(q_mat[7, :])]) + 1
+    # y_min = np.min([np.min(q_mat[0, :]), np.min(q_mat[6, :])]) - 1
+    # y_max = np.max([np.max(q_mat[0, :]), np.max(q_mat[6, :])]) + 1
+    x_min = -1.0
+    x_max = 10.5
+    y_min = -1.0
+    y_max = 11.0
 
     # Initialize figure
     fig, ax = initialize_phase_plot(x_min, x_max, y_min, y_max)
-    ax.grid()
-    ax.grid(which="minor", linestyle=":", linewidth="0.5", color="gray")
+    ax.set_xticks([0, 2, 4, 6, 8, 10])
+    ax.set_yticks([0, 2, 4, 6, 8, 10])
+    ax.grid(True, which="major", linestyle=":", color="gray", linewidth=0.5, zorder=1)
+    ax.grid(True, which="minor", linestyle=":", color="gray", linewidth=0.3, zorder=1)
+    ax.minorticks_on()
     ax.set_axisbelow(True)
 
     # World reference frame
-    origin = np.array([0, 0])
+    # origin = np.array([0, 0])
     arrow_inertial_x = np.array([0, 1])
     arrow_inertial_y = np.array([1, 0])
-    plt.arrow(
-        *origin, *arrow_inertial_x, head_width=0.05, color="k", linewidth=1.5, zorder=10
-    )
-    plt.arrow(
-        *origin, *arrow_inertial_y, head_width=0.05, color="k", linewidth=1.5, zorder=10
-    )
+    # plt.arrow(
+    #     *origin,
+    #     *arrow_inertial_x,
+    #     head_width=0.05,
+    #     color="k",
+    #     linewidth=1.5,
+    #     zorder=10,
+    # )
+    # plt.arrow(
+    #     *origin,
+    #     *arrow_inertial_y,
+    #     head_width=0.05,
+    #     color="k",
+    #     linewidth=1.5,
+    #     zorder=10,
+    # )
 
     # Plot body reference frames for SeaCat
     for offset_idx in [0, 6]:
 
         # Select color
         if offset_idx == 0:
-            color = "#025A1F"
-            color_light = "#32f17b"
+            color = "#000000"
+            color_light = "#0CB143"
         else:
-            color = "#660404"
-            color_light = "#f35757"
+            color = "#000000"
+            color_light = "#AA1313"
 
         # Plot body reference frames
         for i in idx:
@@ -288,6 +317,8 @@ def phase_plot(
                         f"{q_mat.shape}."
                     )
             psi = q_mat[2 + offset_idx, i]
+            if i == 0 and offset_idx == 6:
+                psi = 3 / 4 * np.pi
             robot = q_mat[offset_idx : offset_idx + 2, i]
             robot = np.array([robot[1], robot[0]])
             arrow_body_x = 0.7 * arrow_inertial_x
@@ -300,7 +331,7 @@ def phase_plot(
                 y=robot[1],
                 dx=arrow_body_x[0],
                 dy=arrow_body_x[1],
-                head_width=0.02,
+                head_width=0.04,
                 color=color,
                 zorder=9,
             )
@@ -309,7 +340,7 @@ def phase_plot(
                 y=robot[1],
                 dx=arrow_body_y[0],
                 dy=arrow_body_y[1],
-                head_width=0.02,
+                head_width=0.04,
                 color=color,
                 zorder=9,
             )
@@ -317,7 +348,7 @@ def phase_plot(
         # Trajectory (rotated to match the orientation of the inertial frame)
         x = q_mat[1 + offset_idx, :]
         y = q_mat[0 + offset_idx, :]
-        ax.plot(x, y, linewidth=2, zorder=8, color=color_light)
+        ax.plot(x, y, linewidth=1.5, zorder=8, color=color_light)
 
     # Create a grid of points for the vector fields
     delta_x = 1.0
@@ -336,8 +367,8 @@ def phase_plot(
         v_y_mat = np.ones_like(Y) * v_y
 
         # Plot the vector field
-        color = "#176cf5"
-        plt.quiver(X, Y, v_x_mat, v_y_mat, color=color, width=0.003, zorder=4)
+        color = "#20509c"
+        plt.quiver(X, Y, v_x_mat, v_y_mat, color=color, width=0.005, zorder=4)
 
     # Plot wind disturbance
     if v_wind is not None and np.linalg.norm(v_wind) > 0:
@@ -349,7 +380,7 @@ def phase_plot(
         v_y_mat = np.ones_like(Y) * v_y
 
         # Plot the vector field
-        color = "#495872"
+        color = "#2FCECE"
         plt.quiver(X, Y, v_x_mat, v_y_mat, color=color, width=0.003, zorder=5)
 
     # Return figure and axes
