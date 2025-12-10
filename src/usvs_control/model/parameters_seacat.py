@@ -1,4 +1,4 @@
-from seacat_dp.model.parameters import Parameters
+from usvs_control.model.parameters import Parameters
 
 
 class SeaCatParameters(Parameters):

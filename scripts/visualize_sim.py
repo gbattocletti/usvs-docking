@@ -8,8 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
-from seacat_dp.utils import io, transformations
-from seacat_dp.visualization import plot_ma
+from usvs_control.utils import io, transformations
+from usvs_control.visualization import plot_ma
 
 # move to the directory of the script
 script_dir = Path(__file__).parent

@@ -17,8 +17,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from seacat_dp.control import ma_mpc
-from seacat_dp.model import (
+from usvs_control.control import ma_mpc
+from usvs_control.model import (
     disturbances,
     hydrodynamics,
     model_seacat,
@@ -27,9 +27,9 @@ from seacat_dp.model import (
     parameters_seadragon,
     wind_dynamics,
 )
-from seacat_dp.utils import io, settings_ma
-from seacat_dp.utils.wrappers import progress_sim
-from seacat_dp.visualization import plot_ma
+from usvs_control.utils import io, settings_ma
+from usvs_control.utils.wrappers import progress_sim
+from usvs_control.visualization import plot_ma
 
 # Load simulation settings
 sim_settings = settings_ma.SimSettings()
@@ -192,7 +192,6 @@ mpc.set_discretization_method(sim_settings.discretization)
 mpc.set_model(plant_sc, plant_sd)
 mpc.set_weights(sim_settings.Q, sim_settings.R, sim_settings.P)
 mpc.set_input_bounds(sim_settings.u_min, sim_settings.u_max)
-mpc.set_input_rate_bounds(sim_settings.delta_u_min / 5, sim_settings.delta_u_max / 5)
 mpc.init_ocp(mode=mode)
 
 # Initialize variables

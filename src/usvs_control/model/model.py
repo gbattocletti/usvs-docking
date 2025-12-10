@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from seacat_dp.model import hydrodynamics
+from usvs_control.model import hydrodynamics
 
 if TYPE_CHECKING:
-    from seacat_dp.model.parameters import Parameters
+    from usvs_control.model.parameters import Parameters
 
 
 class USVModel(ABC):

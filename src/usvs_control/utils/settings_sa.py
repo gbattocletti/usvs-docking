@@ -1,6 +1,6 @@
 import numpy as np
 
-from seacat_dp.model import parameters_seacat, parameters_seadragon
+from usvs_control.model import parameters_seacat, parameters_seadragon
 
 
 class SimSettings:

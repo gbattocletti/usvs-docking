@@ -7,15 +7,15 @@ simulation results are plotted at the end of the simulation.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from seacat_dp.model import (
+from usvs_control.model import (
     disturbances,
     model_seacat,
     model_seadragon,
     parameters_seacat,
     parameters_seadragon,
 )
-from seacat_dp.utils.wrappers import progress_sim
-from seacat_dp.visualization import plot
+from usvs_control.utils.wrappers import progress_sim
+from usvs_control.visualization import plot
 
 ### SIMULATION SETTINGS - USER DEFINABLE ###############################################
 

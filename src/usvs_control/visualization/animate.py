@@ -4,9 +4,9 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.lines import Line2D
 from matplotlib.patches import FancyArrow, Polygon, Rectangle
 
-from seacat_dp.utils.transformations import R_i2b
-from seacat_dp.visualization.colors import CmdColors
-from seacat_dp.visualization.plot import initialize_phase_plot
+from usvs_control.utils.transformations import R_i2b
+from usvs_control.visualization.colors import CmdColors
+from usvs_control.visualization.plot import initialize_phase_plot
 
 
 def animation_step(

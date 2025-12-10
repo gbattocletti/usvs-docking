@@ -2,10 +2,10 @@ import casadi as ca
 import numpy as np
 import scipy.linalg
 
-from seacat_dp.control.mpc import Mpc
-from seacat_dp.model.model_seacat import SeaCatModel
-from seacat_dp.model.model_seadragon import SeaDragonModel
-from seacat_dp.visualization.colors import CmdColors
+from usvs_control.control.mpc import Mpc
+from usvs_control.model.model_seacat import SeaCatModel
+from usvs_control.model.model_seadragon import SeaDragonModel
+from usvs_control.visualization.colors import CmdColors
 
 # TODO: consider adding an optional q_ref argument and a corresponding solution
 # strategy (e.g., distributed tracking MPC, where both USVs have their own reference
@@ -337,36 +337,36 @@ class DockingMpc(Mpc):
                 )
 
         # Input rate constraints
-        # if self.u_rate_min is not None and self.u_rate_max is not None:
-        #     for k in range(1, self.N):
-        #         self.ocp.subject_to(
-        #             self.ocp.bounded(
-        #                 self.u_rate_min,
-        #                 self.u[:, k:] - self.u[:, k - 1],
-        #                 self.u_rate_max,
-        #             )
-        #         )
+        if self.u_rate_min is not None and self.u_rate_max is not None:
+            for k in range(1, self.N):
+                self.ocp.subject_to(
+                    self.ocp.bounded(
+                        self.u_rate_min,
+                        self.u[:, k:] - self.u[:, k - 1],
+                        self.u_rate_max,
+                    )
+                )
 
         # Maximum input constraint (1-norm constraint)
         # NOTE: this constraint is applied separately to the inputs of each USV, as each
         # of them has its own maximum total thrust capability (power budget). For the
         # SeaDragon, the power consumption is computed only for the thrust force and not
-        # for the azimuth angle.
-        # if self.max_tot_u is not None:
-        #     for k in range(self.N):
-        #         self.ocp.subject_to(ca.norm_1(self.u[0:4, k]) <= self.max_tot_u_sc)
-        #         self.ocp.subject_to(ca.norm_1(self.u[4:6, k]) <= self.max_tot_u_sd)
+        for the azimuth angle.
+        if self.max_tot_u is not None:
+            for k in range(self.N):
+                self.ocp.subject_to(ca.norm_1(self.u[0:4, k]) <= self.max_tot_u_sc)
+                self.ocp.subject_to(ca.norm_1(self.u[4:6, k]) <= self.max_tot_u_sd)
 
-        # # State constraints
-        # if self.q_min is not None or self.q_max is not None:
-        #     for k in range(self.N + 1):
-        #         self.ocp.subject_to(
-        #             self.ocp.bounded(
-        #                 self.q_min,
-        #                 self.q[:, k],
-        #                 self.q_max,
-        #             )
-        #         )
+        # State constraints
+        if self.q_min is not None or self.q_max is not None:
+            for k in range(self.N + 1):
+                self.ocp.subject_to(
+                    self.ocp.bounded(
+                        self.q_min,
+                        self.q[:, k],
+                        self.q_max,
+                    )
+                )
 
         # Collision avoidance constraints between the two USVs
         for k in range(self.N):

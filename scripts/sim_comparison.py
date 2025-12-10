@@ -20,8 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
-from seacat_dp.control import ma_mpc
-from seacat_dp.model import (
+from usvs_control.control import ma_mpc
+from usvs_control.model import (
     disturbances,
     hydrodynamics,
     model_seacat,
@@ -29,10 +29,10 @@ from seacat_dp.model import (
     parameters_seacat,
     parameters_seadragon,
 )
-from seacat_dp.utils import io, settings_ma, transformations
-from seacat_dp.utils.wrappers import progress_sim
-from seacat_dp.visualization import plot_ma
-from seacat_dp.visualization.colors import CmdColors
+from usvs_control.utils import io, settings_ma, transformations
+from usvs_control.utils.wrappers import progress_sim
+from usvs_control.visualization import plot_ma
+from usvs_control.visualization.colors import CmdColors
 
 # Set cwd to the script directory
 script_dir = Path(__file__).parent

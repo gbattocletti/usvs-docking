@@ -11,10 +11,10 @@ from matplotlib.animation import FuncAnimation
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 from tqdm import tqdm
 
-from seacat_dp.control import linear_mpc, mpc, nonlinear_mpc
-from seacat_dp.model import disturbances, model_seacat, parameters_seacat
-from seacat_dp.utils import settings_sa
-from seacat_dp.visualization.colors import CmdColors
+from usvs_control.control import linear_mpc, mpc, nonlinear_mpc
+from usvs_control.model import disturbances, model_seacat, parameters_seacat
+from usvs_control.utils import settings_sa
+from usvs_control.visualization.colors import CmdColors
 
 
 def generate_filename() -> tuple[str, str]:

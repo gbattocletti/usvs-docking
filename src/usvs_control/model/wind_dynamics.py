@@ -1,6 +1,6 @@
 import numpy as np
 
-from seacat_dp.utils.transformations import R_i2b
+from usvs_control.utils.transformations import R_i2b
 
 
 def wind_load(q: np.ndarray, v_wind: np.ndarray) -> np.ndarray:

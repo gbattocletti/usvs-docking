@@ -3,9 +3,9 @@ import gurobipy
 import numpy as np
 from scipy.signal import cont2discrete
 
-from seacat_dp.control.mpc import Mpc
-from seacat_dp.utils.transformations import R_b2i
-from seacat_dp.visualization.colors import CmdColors
+from usvs_control.control.mpc import Mpc
+from usvs_control.utils.transformations import R_b2i
+from usvs_control.visualization.colors import CmdColors
 
 
 class LinearMpc(Mpc):

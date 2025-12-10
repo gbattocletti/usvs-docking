@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 
-from seacat_dp.utils.transformations import R_i2b
+from usvs_control.utils.transformations import R_i2b
 
 labels_font_size = 6
 tick_labels_font_size = 6

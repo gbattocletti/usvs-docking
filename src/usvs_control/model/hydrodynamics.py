@@ -2,10 +2,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from seacat_dp.utils.transformations import R_i2b
+from usvs_control.utils.transformations import R_i2b
 
 if TYPE_CHECKING:
-    from seacat_dp.model.parameters import Parameters
+    from usvs_control.model.parameters import Parameters
 
 
 def added_mass_surge(pars: "Parameters") -> float:

@@ -1,9 +1,9 @@
 import numpy as np
 
-from seacat_dp.model import hydrodynamics, wind_dynamics
-from seacat_dp.model.model import USVModel
-from seacat_dp.model.parameters_seadragon import SeaDragonParameters
-from seacat_dp.utils.transformations import R_b2i
+from usvs_control.model import hydrodynamics, wind_dynamics
+from usvs_control.model.model import USVModel
+from usvs_control.model.parameters_seadragon import SeaDragonParameters
+from usvs_control.utils.transformations import R_b2i
 
 
 class SeaDragonModel(USVModel):

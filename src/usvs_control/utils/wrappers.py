@@ -3,7 +3,7 @@ from collections.abc import Iterable
 
 from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
-from seacat_dp.visualization.colors import CmdColors
+from usvs_control.visualization.colors import CmdColors
 
 
 def progress_sim(

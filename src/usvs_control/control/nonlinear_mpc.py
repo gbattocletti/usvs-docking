@@ -2,8 +2,8 @@ import casadi as ca
 import cvxpy as cp
 import numpy as np
 
-from seacat_dp.control.mpc import Mpc
-from seacat_dp.visualization.colors import CmdColors
+from usvs_control.control.mpc import Mpc
+from usvs_control.visualization.colors import CmdColors
 
 
 class NonlinearMpc(Mpc):
