@@ -6,6 +6,8 @@
 
 This repository contains a collection of dynamic models and controllers for the dynamic positioning and cooperative docking of autonomous Uncrewed Surface Vehicles (USV). The target USVs are the SeaCAT2 and SeaDragon, used in the [SeaClear2 project](https://www.seaclear2.eu/).
 
+![](/doc/usvs.png)
+
 ## Installation
 The repository is structured as a python package.
 To install, clone the repository by running:
@@ -25,7 +27,6 @@ The repository is structured as a python package. The project structure is detai
 ```
 root/  
 │  
-│
 ├── scripts/                    # folder with simulation files and experiments
 │   ├── results/
 │   │   └── .pkl, .gif, ...     # saved simulation data (pickle files, gifs...)
@@ -65,5 +66,5 @@ The repository is provided under the GNU GPLv3 License. See the LICENSE file inc
 ## Author
 
 [Gianpietro Battocletti](https://www.tudelft.nl/staff/g.battocletti/), PhD Candidate at the [Delft Center for Systems and Control](https://www.tudelft.nl/en/me/about/departments/delft-center-for-systems-and-control/), [Delft University of Technology](https://www.tudelft.nl/en/).<br>
-Contact information: [g.battocletti@tudelft.nl]()<br>
+Contact information: [g.battocletti@tudelft.nl]().<br>
 Copyright (c) 2025 Gianpietro Battocletti.
