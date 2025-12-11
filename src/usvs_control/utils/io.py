@@ -295,7 +295,7 @@ def save_animation(anim: FuncAnimation, sim_name: str, **kwargs) -> None:
         sim_name.replace(".gif", "")
 
     # Create filename
-    filename = f"results\\{sim_name}\\{sim_name}-animation.gif"
+    filename = f"results\\{sim_name}.gif"
 
     # Save animation
     total_frames = anim._save_count  # pylint: disable=protected-access

@@ -1,6 +1,6 @@
 # Blacklist development folders
 dev/
-results/
+results-dev/
 .env
 
 # Project files

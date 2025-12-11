@@ -12,8 +12,8 @@ This repository contains a collection of dynamic models and controllers for the 
 The repository is structured as a python package.
 To install, clone the repository by running:
 ```sh
-git clone https://github.com/gbattocletti/seacat2-dynamic-positioning.git
-cd seacat2-dynamic-positioning
+git clone https://github.com/gbattocletti/usvs_control.git
+cd usvs_control
 pip install .
 ```
 
@@ -29,7 +29,7 @@ root/
 │  
 ├── scripts/                    # folder with simulation files and experiments
 │   ├── results/
-│   │   └── .pkl, .gif, ...     # saved simulation data (pickle files, gifs...)
+│   │   └── .pkl, .gif, ...     # saved simulation data (pickle data files, gifs...)
 │   ├── sim_comparison.py       # compare different controllers for the docking of two USVs
 │   ├── sim_docking.py          # simulate the cooperative autonomous docking of two USVs
 │   ├── sim_model.py            # simulation of the nonlinear model of a USV without control

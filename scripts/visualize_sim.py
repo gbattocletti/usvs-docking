@@ -4,10 +4,12 @@ Generates the plots from a previously generated .pkl file.
 
 import os
 import pickle
+import sys
 from pathlib import Path
 
 import numpy as np
 
+import usvs_control
 from usvs_control.utils import io, transformations
 from usvs_control.visualization import plot_ma
 
@@ -16,9 +18,10 @@ script_dir = Path(__file__).parent
 os.chdir(script_dir)
 
 # select data to visualize
-filename = "results/experiment-4/cooperative-no-b-data.pkl"
+filename = "results/experiment-1-cooperative-qref-1.pkl"
 
 # load the simulation data
+sys.modules["seacat_dp"] = usvs_control  # module was renamed after saving pkl
 with open(filename, "rb") as f:
     data = pickle.load(f)
 
